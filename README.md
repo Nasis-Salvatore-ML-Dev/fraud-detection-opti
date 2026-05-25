@@ -1,6 +1,12 @@
 # Fraud Detection API — Optimised Pipeline
 
-This document records the full analytical process carried out to upgrade the baseline fraud detection pipeline to a senior-grade production ML system. It covers the audit of what the system should ideally deliver, an honest assessment of what the baseline actually delivers, a systematic function analysis of every component, and the complete set of solutions derived from that analysis.
+This document records the full analytical process carried out to upgrade the baseline fraud
+detection pipeline to a senior-grade production ML system. The process follows a structured,
+systematic approach to "inventive problem-solving": starting from a definition of what the system
+should ideally deliver, moving through an honest assessment of what the baseline actually
+delivers, a rigorous function analysis of every component and its interactions, identification
+of all bad functions and contradictions, and finally a complete set of engineered solutions
+derived from that analysis.
 
 ---
 
