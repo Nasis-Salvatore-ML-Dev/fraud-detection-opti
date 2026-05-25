@@ -1,0 +1,404 @@
+<style>
+body{margin:0;padding:0}
+.legend{display:flex;flex-wrap:wrap;gap:12px;padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-secondary)}
+.legend-item{display:flex;align-items:center;gap:6px}
+.leg-line{width:28px;height:3px}
+.leg-green{background:#1D9E75}
+.leg-dash{background:transparent;border-top:2px dashed #1D9E75}
+.leg-red{background:#E24B4A}
+.leg-grey{background:transparent;border-top:1.5px dotted #888780}
+.leg-black{background:#2C2C2A;height:4px}
+svg text{font-family:var(--font-sans,sans-serif)}
+</style>
+<div class="legend">
+  <div class="legend-item"><div class="leg-line leg-green"></div><span>Useful</span></div>
+  <div class="legend-item"><div class="leg-line leg-dash"></div><span>Insufficient</span></div>
+  <div class="legend-item"><div class="leg-line leg-red"></div><span>Harmful</span></div>
+  <div class="legend-item"><div class="leg-line leg-grey"></div><span>Absent</span></div>
+  <div class="legend-item"><div class="leg-line leg-black"></div><span>Excessive</span></div>
+  <div class="legend-item"><svg width="36" height="16"><rect x="2" y="2" width="32" height="12" rx="6" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="3 2"/></svg><span>Supersystem node</span></div>
+  <div class="legend-item"><svg width="36" height="16"><rect x="2" y="2" width="32" height="12" rx="2" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="3 2"/></svg><span>Absent component</span></div>
+</div>
+<svg width="100%" viewBox="0 0 1100 1380" role="img">
+<title>TRIZ function model — fraud detection pipeline</title>
+<desc>Function model showing all pipeline components, supersystem nodes, and their useful, insufficient, harmful, and absent interactions.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#E24B4A" stroke-width="1.5" stroke-linecap="round"/></marker>
+<marker id="grey" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/></marker>
+<marker id="blk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#2C2C2A" stroke-width="1.5" stroke-linecap="round"/></marker>
+</defs>
+
+<!-- ── SUPERSYSTEM NODES (rounded rect, dashed border) ── -->
+<!-- Transaction System -->
+<rect x="20" y="20" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="110" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Transaction System</text>
+<text x="110" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Payment Gateway</text>
+
+<!-- Fraudulent Users -->
+<rect x="440" y="20" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="520" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Fraudulent Users</text>
+<text x="520" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Adversarial actors</text>
+
+<!-- Legitimate Customers -->
+<rect x="660" y="20" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="740" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Legitimate Customers</text>
+<text x="740" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Good transactions</text>
+
+<!-- Regulatory Bodies -->
+<rect x="880" y="20" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Regulatory Bodies</text>
+<text x="970" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">EU AI Act, GDPR</text>
+
+<!-- Fraud Analysts -->
+<rect x="880" y="580" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Fraud Analysts</text>
+<text x="970" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Manual review team</text>
+
+<!-- IT Infrastructure -->
+<rect x="20" y="580" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="100" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">IT Infrastructure</text>
+<text x="100" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">AWS Cloud, Lambda</text>
+
+<!-- ── PIPELINE COMPONENTS (solid rect) ── -->
+<!-- Raw Dataset -->
+<rect x="220" y="110" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="128" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Raw Dataset</text>
+<text x="300" y="144" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">creditcard.csv</text>
+
+<!-- Training Pipeline -->
+<rect x="220" y="220" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Training Pipeline</text>
+<text x="300" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">train.py</text>
+
+<!-- Hyperparameter Tuner -->
+<rect x="60" y="220" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="130" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">HPO Tuner</text>
+<text x="130" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">tune.py — never run</text>
+
+<!-- Feature Engineering -->
+<rect x="440" y="220" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Feature Engineering</text>
+<text x="520" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">preprocessing.py</text>
+
+<!-- Model Bundle -->
+<rect x="220" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Bundle</text>
+<text x="300" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">xgboost_v1.pkl</text>
+
+<!-- ONNX Exporter -->
+<rect x="60" y="340" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="130" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">ONNX Exporter</text>
+<text x="130" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">export_onnx.py</text>
+
+<!-- SHAP Background -->
+<rect x="440" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">SHAP Background</text>
+<text x="520" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">shap_background.pkl</text>
+
+<!-- Model Loader -->
+<rect x="220" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Loader</text>
+<text x="300" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">model_loader.py</text>
+
+<!-- Schema Validation -->
+<rect x="660" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="740" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Schema Validation</text>
+<text x="740" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">schemas.py</text>
+
+<!-- Inference API -->
+<rect x="440" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Inference API</text>
+<text x="520" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">app.py / FastAPI</text>
+
+<!-- Decision Threshold -->
+<rect x="660" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="740" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Decision Threshold</text>
+<text x="740" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">hardcoded in bundle</text>
+
+<!-- SHAP Explainer -->
+<rect x="660" y="580" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="740" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">SHAP Explainer</text>
+<text x="740" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">disabled — ABI crash</text>
+
+<!-- Audit Logger -->
+<rect x="440" y="580" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Audit Logger</text>
+<text x="520" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">DynamoDB append-only</text>
+
+<!-- Override Queue -->
+<rect x="440" y="700" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Override Queue</text>
+<text x="520" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">DynamoDB TTL 30d</text>
+
+<!-- Drift Monitor -->
+<rect x="220" y="700" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Drift Monitor</text>
+<text x="300" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">PSI — 4 features</text>
+
+<!-- PSI Baseline -->
+<rect x="60" y="700" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="130" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">PSI Baseline</text>
+<text x="130" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">training_baseline.json</text>
+
+<!-- Bias Tester -->
+<rect x="220" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="300" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Bias Tester</text>
+<text x="300" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">4 segments, CD gate</text>
+
+<!-- CI/CD Pipeline -->
+<rect x="60" y="820" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="130" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">CI/CD Pipeline</text>
+<text x="130" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">GitHub Actions</text>
+
+<!-- Model Card Generator -->
+<rect x="440" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="520" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Card Generator</text>
+<text x="520" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Mitchell et al.</text>
+
+<!-- Load Tester -->
+<rect x="660" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
+<text x="740" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Load Tester</text>
+<text x="740" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Locust — not in CD</text>
+
+<!-- ── ABSENT COMPONENTS (dashed rect) ── -->
+<!-- Online Feature Store -->
+<rect x="660" y="220" width="160" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="740" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Online Feature Store</text>
+<text x="740" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: velocity features)</text>
+
+<!-- Retraining Trigger -->
+<rect x="60" y="460" width="140" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="130" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Retraining Trigger</text>
+<text x="130" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: auto-retrain)</text>
+
+<!-- Calibrated Confidence -->
+<rect x="880" y="460" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Calibrated Confidence</text>
+<text x="970" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: Platt scaling)</text>
+
+<!-- Canary Deployer -->
+<rect x="880" y="820" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Canary Deployer</text>
+<text x="970" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: weighted alias)</text>
+
+<!-- Rule-Based Fallback -->
+<rect x="880" y="700" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Rule-Based Fallback</text>
+<text x="970" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: heuristic scorer)</text>
+
+<!-- ── ARROWS ── -->
+
+<!-- Transaction System → Raw Dataset: useful: supplies transactions -->
+<line x1="200" y1="42" x2="280" y2="110" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="225" y="76" font-size="9" fill="#1D9E75">useful: supplies</text>
+
+<!-- Transaction System → Schema Validation: useful: sends request -->
+<line x1="200" y1="55" x2="660" y2="362" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="370" y="180" font-size="9" fill="#1D9E75">useful: sends request</text>
+
+<!-- Fraudulent Users → Transaction System: harmful: injects fraud -->
+<line x1="440" y1="42" x2="200" y2="42" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="300" y="36" font-size="9" fill="#E24B4A">harmful: injects fraud</text>
+
+<!-- Legitimate Customers → Transaction System: useful: submits transaction -->
+<line x1="660" y1="42" x2="610" y2="42" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="620" y="36" font-size="9" fill="#1D9E75">useful: submits</text>
+
+<!-- Raw Dataset → Training Pipeline: useful: supplies labels -->
+<line x1="300" y1="154" x2="300" y2="220" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="306" y="192" font-size="9" fill="#1D9E75">useful: supplies labels</text>
+
+<!-- HPO Tuner → Training Pipeline: insufficient: optimises params -->
+<line x1="200" y1="242" x2="220" y2="242" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="148" y="234" font-size="9" fill="#1D9E75">insuff: optimises</text>
+
+<!-- Training Pipeline → Feature Engineering: useful: calls engineer -->
+<line x1="380" y1="242" x2="440" y2="242" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="388" y="234" font-size="9" fill="#1D9E75">useful: calls</text>
+
+<!-- Training Pipeline → Model Bundle: useful: produces model -->
+<line x1="300" y1="264" x2="300" y2="340" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="306" y="308" font-size="9" fill="#1D9E75">useful: produces</text>
+
+<!-- Training Pipeline → SHAP Background: useful: samples -->
+<line x1="380" y1="255" x2="440" y2="348" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="408" y="296" font-size="9" fill="#1D9E75">useful: samples</text>
+
+<!-- Training Pipeline → ONNX Exporter: insufficient: exports -->
+<line x1="220" y1="255" x2="200" y2="340" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="156" y="296" font-size="9" fill="#1D9E75">insuff: exports</text>
+
+<!-- Feature Engineering → Inference API: insufficient: transforms features -->
+<line x1="520" y1="264" x2="520" y2="460" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="526" y="370" font-size="9" fill="#1D9E75">insuff: transforms</text>
+
+<!-- Feature Engineering → Online Feature Store: absent -->
+<line x1="620" y1="242" x2="660" y2="242" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
+<text x="626" y="234" font-size="9" fill="#888780">absent: velocity</text>
+
+<!-- Feature Engineering: harmful: hardcoded constants → itself modelled as self-loop label -->
+<text x="442" y="214" font-size="9" fill="#E24B4A">harmful: skew via hardcoded constants</text>
+
+<!-- Model Bundle → Model Loader: useful: provides bundle -->
+<line x1="300" y1="384" x2="300" y2="460" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="306" y="428" font-size="9" fill="#1D9E75">useful: provides</text>
+
+<!-- Model Bundle: harmful: locks runtime -->
+<line x1="220" y1="362" x2="130" y2="362" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="136" y="354" font-size="9" fill="#E24B4A">harmful: locks runtime</text>
+
+<!-- SHAP Background → SHAP Explainer: insufficient: enables init -->
+<line x1="600" y1="362" x2="700" y2="580" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="636" y="470" font-size="9" fill="#1D9E75">insuff: enables init</text>
+
+<!-- Schema Validation → Inference API: insufficient: validates input -->
+<line x1="740" y1="384" x2="620" y2="460" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="660" y="420" font-size="9" fill="#1D9E75">insuff: validates</text>
+
+<!-- Model Loader → Inference API: useful: loads model -->
+<line x1="440" y1="482" x2="600" y2="482" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="450" y="474" font-size="9" fill="#1D9E75">useful: loads model</text>
+
+<!-- Inference API → Decision Threshold: useful: applies threshold -->
+<line x1="600" y1="482" x2="660" y2="482" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="604" y="474" font-size="9" fill="#1D9E75">useful: applies</text>
+
+<!-- Decision Threshold: harmful: rigid — no runtime adjust -->
+<line x1="820" y1="482" x2="880" y2="482" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="824" y="474" font-size="9" fill="#E24B4A">absent: runtime adjust</text>
+<rect x="880" y="461" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
+<text x="970" y="479" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Calibrated Confidence</text>
+<text x="970" y="495" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: Platt scaling)</text>
+
+<!-- Inference API → Audit Logger: useful: logs prediction -->
+<line x1="520" y1="504" x2="520" y2="580" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="526" y="546" font-size="9" fill="#1D9E75">useful: logs</text>
+
+<!-- Inference API → SHAP Explainer: harmful: crashes via ABI -->
+<line x1="600" y1="497" x2="660" y2="580" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="614" y="538" font-size="9" fill="#E24B4A">harmful: crashes ABI</text>
+
+<!-- Inference API → Rule-Based Fallback: absent -->
+<line x1="680" y1="497" x2="880" y2="718" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
+<text x="760" y="600" font-size="9" fill="#888780">absent: fallback</text>
+
+<!-- Inference API: harmful: fake confidence → Legitimate Customers -->
+<line x1="600" y1="470" x2="740" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="688" y="260" font-size="9" fill="#E24B4A">harmful: fake confidence</text>
+
+<!-- Decision Threshold → Legitimate Customers: harmful: false positive blocks -->
+<line x1="820" y1="470" x2="820" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="826" y="260" font-size="9" fill="#E24B4A">harmful: false positive</text>
+
+<!-- SHAP Explainer → Audit Logger: insufficient: populates SHAP values -->
+<line x1="700" y1="602" x2="600" y2="602" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="616" y="594" font-size="9" fill="#1D9E75">insuff: populates</text>
+
+<!-- Audit Logger → Drift Monitor: insufficient: feeds records -->
+<line x1="440" y1="610" x2="380" y2="710" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="380" y="658" font-size="9" fill="#1D9E75">insuff: feeds records</text>
+
+<!-- Audit Logger → Override Queue: useful: routes uncertain -->
+<line x1="520" y1="624" x2="520" y2="700" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="526" y="666" font-size="9" fill="#1D9E75">useful: routes</text>
+
+<!-- Audit Logger: harmful: missing V1-V28 → Regulatory Bodies -->
+<line x1="560" y1="580" x2="970" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="800" y="300" font-size="9" fill="#E24B4A">harmful: incomplete record</text>
+
+<!-- PSI Baseline → Drift Monitor: useful: anchors baseline -->
+<line x1="200" y1="722" x2="220" y2="722" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="144" y="714" font-size="9" fill="#1D9E75">useful: anchors</text>
+
+<!-- Drift Monitor → IT Infrastructure: insufficient: publishes PSI -->
+<line x1="220" y1="722" x2="180" y2="622" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="156" y="676" font-size="9" fill="#1D9E75">insuff: publishes PSI</text>
+
+<!-- Drift Monitor → Retraining Trigger: absent -->
+<line x1="220" y1="738" x2="130" y2="460" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
+<text x="100" y="590" font-size="9" fill="#888780">absent: triggers retrain</text>
+
+<!-- Override Queue → Fraud Analysts: insufficient: routes for review -->
+<line x1="600" y1="722" x2="880" y2="602" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="700" y="658" font-size="9" fill="#1D9E75">insuff: routes review</text>
+
+<!-- Fraud Analysts → Override Queue: useful: resolves decision -->
+<line x1="880" y1="614" x2="760" y2="724" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="810" y="680" font-size="9" fill="#1D9E75">useful: resolves</text>
+
+<!-- Bias Tester → CI/CD Pipeline: useful: gates deployment -->
+<line x1="220" y1="842" x2="200" y2="842" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="148" y="834" font-size="9" fill="#1D9E75">useful: gates</text>
+
+<!-- Bias Tester: insufficient: evaluates fairness -->
+<line x1="300" y1="864" x2="300" y2="900" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="306" y="886" font-size="9" fill="#1D9E75">insuff: evaluates fairness</text>
+<text x="240" y="916" font-size="9" fill="var(--color-text-secondary)">(4 segments, no directional metric)</text>
+
+<!-- Bias Tester → Regulatory Bodies: insufficient: evidences compliance -->
+<line x1="380" y1="830" x2="880" y2="42" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="640" y="390" font-size="9" fill="#1D9E75">insuff: evidences</text>
+
+<!-- CI/CD → Canary Deployer: absent -->
+<line x1="200" y1="842" x2="880" y2="842" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
+<text x="480" y="834" font-size="9" fill="#888780">absent: canary deploy</text>
+
+<!-- CI/CD: harmful: static IAM keys → IT Infrastructure -->
+<line x1="130" y1="820" x2="100" y2="624" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="50" y="720" font-size="9" fill="#E24B4A">harmful: static keys</text>
+
+<!-- Model Card Generator → Regulatory Bodies: useful: documents model -->
+<line x1="600" y1="830" x2="970" y2="64" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="820" y="430" font-size="9" fill="#1D9E75">useful: documents</text>
+
+<!-- Load Tester → Inference API: insufficient: measures latency -->
+<line x1="740" y1="820" x2="620" y2="504" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
+<text x="706" y="660" font-size="9" fill="#1D9E75">insuff: measures latency</text>
+
+<!-- IT Infrastructure → Model Loader: useful: hosts Lambda -->
+<line x1="180" y1="602" x2="220" y2="478" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="142" y="538" font-size="9" fill="#1D9E75">useful: hosts</text>
+
+<!-- Regulatory Bodies → Pipeline (Audit Logger): useful: mandates logging -->
+<line x1="970" y1="64" x2="600" y2="580" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
+<text x="830" y="340" font-size="9" fill="#1D9E75">useful: mandates log</text>
+
+<!-- Fraudulent Users → Inference API: harmful: adversarial inputs -->
+<line x1="520" y1="64" x2="520" y2="460" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
+<text x="526" y="270" font-size="9" fill="#E24B4A">harmful: adversarial inputs</text>
+
+<!-- ── CONTRADICTION ANNOTATIONS ── -->
+<rect x="20" y="960" width="1060" height="400" rx="6" fill="var(--color-background-secondary)" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
+<text x="40" y="990" font-size="12" font-weight="500" fill="var(--color-text-primary)">Contradictions (useful / harmful between same pair)</text>
+
+<text x="40" y="1014" font-size="11" font-weight="500" fill="#E24B4A">C1</text>
+<text x="60" y="1014" font-size="11" fill="var(--color-text-primary)">Inference API → Legitimate Customers: useful: approves legitimate  |  harmful: false positive blocks legitimate</text>
+<text x="40" y="1034" font-size="11" font-weight="500" fill="#E24B4A">C2</text>
+<text x="60" y="1034" font-size="11" fill="var(--color-text-primary)">Inference API → SHAP Explainer: useful: calls explainer  |  harmful: crashes explainer via ABI mismatch</text>
+<text x="40" y="1054" font-size="11" font-weight="500" fill="#E24B4A">C3</text>
+<text x="60" y="1054" font-size="11" fill="var(--color-text-primary)">Audit Logger → Regulatory Bodies: useful: evidences compliance  |  harmful: incomplete record violates Art. 12</text>
+<text x="40" y="1074" font-size="11" font-weight="500" fill="#E24B4A">C4</text>
+<text x="60" y="1074" font-size="11" fill="var(--color-text-primary)">Decision Threshold → Fraudulent Users: useful: blocks fraud  |  harmful: rigid threshold misses adaptive fraud patterns</text>
+<text x="40" y="1094" font-size="11" font-weight="500" fill="#E24B4A">C5</text>
+<text x="60" y="1094" font-size="11" fill="var(--color-text-primary)">Model Bundle → Model Loader: useful: provides model  |  harmful: pickle lock-in creates silent version skew</text>
+<text x="40" y="1114" font-size="11" font-weight="500" fill="#E24B4A">C6</text>
+<text x="60" y="1114" font-size="11" fill="var(--color-text-primary)">CI/CD Pipeline → IT Infrastructure: useful: deploys service  |  harmful: static IAM keys expose cloud credentials</text>
+<text x="40" y="1134" font-size="11" font-weight="500" fill="#E24B4A">C7</text>
+<text x="60" y="1134" font-size="11" fill="var(--color-text-primary)">Bias Tester → Regulatory Bodies: useful: gates biased models  |  insufficient: 4 segments miss directional bias</text>
+
+<text x="40" y="1166" font-size="12" font-weight="500" fill="var(--color-text-primary)">Absent functions</text>
+<text x="40" y="1186" font-size="11" fill="var(--color-text-primary)">• Online Feature Store — absent: velocity feature aggregation per card / merchant</text>
+<text x="40" y="1202" font-size="11" fill="var(--color-text-primary)">• Retraining Trigger — absent: automated multi-signal retraining initiation</text>
+<text x="40" y="1218" font-size="11" fill="var(--color-text-primary)">• Calibrated Confidence — absent: Platt-scaled uncertainty score per prediction</text>
+<text x="40" y="1234" font-size="11" fill="var(--color-text-primary)">• Rule-Based Fallback — absent: heuristic scorer on model failure</text>
+<text x="40" y="1250" font-size="11" fill="var(--color-text-primary)">• Canary Deployer — absent: weighted Lambda alias for gradual rollout</text>
+
+<text x="40" y="1278" font-size="12" font-weight="500" fill="var(--color-text-primary)">Harmful functions</text>
+<text x="40" y="1298" font-size="11" fill="var(--color-text-primary)">• Fraudulent Users → Transaction System: injects adversarial transactions</text>
+<text x="40" y="1314" font-size="11" fill="var(--color-text-primary)">• Inference API → Legitimate Customers: false positive blocks legitimate transactions</text>
+<text x="40" y="1330" font-size="11" fill="var(--color-text-primary)">• Inference API → Legitimate Customers: fake confidence score misleads downstream consumers</text>
+<text x="40" y="1346" font-size="11" fill="var(--color-text-primary)">• Inference API → SHAP Explainer: ABI crash disables explainability at runtime</text>
+<text x="40" y="1362" font-size="11" fill="var(--color-text-primary)">• Model Bundle → ONNX Exporter: pickle lock-in silently supersedes verified ONNX artifact</text>
+<text x="40" y="1378" font-size="11" fill="var(--color-text-primary)">• CI/CD Pipeline → IT Infrastructure: static IAM keys create persistent credential exposure</text>
+</svg>
