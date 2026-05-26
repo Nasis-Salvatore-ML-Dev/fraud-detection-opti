@@ -5,6 +5,7 @@ Loads creditcard.csv, engineers features, trains on first 80% chronologically,
 evaluates on last 20%, and saves the model bundle + SHAP background sample.
 """
 
+import argparse
 import json
 import logging
 import sys
@@ -12,6 +13,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import optuna
 import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
@@ -21,6 +23,9 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 
 from src.features.engineering import engineer_features
+
+# Suppress Optuna's per-trial verbosity; we log trial results ourselves.
+optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 # ---------------------------------------------------------------------------
 # Logging: INFO → stdout, WARNING+ → stderr
@@ -74,6 +79,73 @@ XGBOOST_PARAMS = dict(
 SHAP_BG_SIZE = 100
 SHAP_BG_SEED = 0
 
+TUNE_N_TRIALS = 100
+# Inner split for Optuna: 75 % of the 80 % training slice = 60 % of total
+_TUNE_INNER_FRAC = 0.75
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def parse_args(argv=None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="XGBoost fraud detection training pipeline.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        default=False,
+        help=(
+            "Run an Optuna hyperparameter search (100 trials) before the final "
+            "model fit.  When omitted, fixed hyperparameters from XGBOOST_PARAMS "
+            "are used and training completes in under 5 minutes."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+# ---------------------------------------------------------------------------
+# Optuna objective
+# ---------------------------------------------------------------------------
+def make_objective(
+    X_tr: pd.DataFrame,
+    y_tr: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    scale_pos_weight: float,
+):
+    """Return an Optuna objective closed over the inner train / val splits.
+
+    scale_pos_weight is derived from class distribution and is never part of
+    the search space — it is passed directly to XGBClassifier.
+    """
+
+    def objective(trial: optuna.Trial) -> float:
+        params = {
+            "n_estimators": trial.suggest_int("n_estimators", 100, 500),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+        }
+        model = XGBClassifier(
+            **params,
+            scale_pos_weight=scale_pos_weight,
+            eval_metric="aucpr",
+            random_state=42,
+            n_jobs=1,
+            verbosity=0,
+        )
+        model.fit(X_tr, y_tr, verbose=False)
+        y_prob = model.predict_proba(X_val)[:, 1]
+        auprc = float(average_precision_score(y_val, y_prob))
+        log.debug("Trial %d: AUPRC=%.4f  params=%s", trial.number, auprc, params)
+        return auprc
+
+    return objective
+
 
 # ---------------------------------------------------------------------------
 # Stratified background sample for SHAP
@@ -99,7 +171,9 @@ def sample_shap_background(
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
-def main() -> None:
+def main(args=None) -> None:
+    if args is None:
+        args = parse_args()
     # ── 1. Load ──────────────────────────────────────────────────────────
     log.info("Loading data from %s", DATA_PATH)
     df = pd.read_csv(DATA_PATH)
@@ -142,9 +216,36 @@ def main() -> None:
     scale_pos_weight = n_neg / n_pos
     log.info("scale_pos_weight = %.2f  (neg=%d / pos=%d)", scale_pos_weight, n_neg, n_pos)
 
-    # ── 5. Train ──────────────────────────────────────────────────────────
-    log.info("Training XGBClassifier  (params: %s)", XGBOOST_PARAMS)
-    model = XGBClassifier(scale_pos_weight=scale_pos_weight, **XGBOOST_PARAMS)
+    # ── 5. Hyperparameter selection (± Optuna tuning) ─────────────────────
+    if args.tune:
+        log.info("Running Optuna study (%d trials)", TUNE_N_TRIALS)
+        inner_idx = int(len(X_train) * _TUNE_INNER_FRAC)
+        X_tr = X_train.iloc[:inner_idx]
+        X_val_inner = X_train.iloc[inner_idx:]
+        y_tr = y_train.iloc[:inner_idx]
+        y_val_inner = y_train.iloc[inner_idx:]
+
+        study = optuna.create_study(
+            direction="maximize",
+            sampler=optuna.samplers.TPESampler(seed=42),
+        )
+        objective = make_objective(X_tr, y_tr, X_val_inner, y_val_inner, scale_pos_weight)
+        study.optimize(objective, n_trials=TUNE_N_TRIALS, n_jobs=1, show_progress_bar=False)
+        log.info(
+            "Optuna study complete: best_value=%.4f  best_trial=#%d",
+            study.best_value,
+            study.best_trial.number,
+        )
+        used_params = dict(study.best_trial.params)
+        used_params.update({"eval_metric": "aucpr", "random_state": 42, "n_jobs": -1})
+    else:
+        used_params = dict(XGBOOST_PARAMS)
+
+    log.info("Hyperparameters selected: %s", used_params)
+
+    # ── 6. Train final model ──────────────────────────────────────────────
+    log.info("Training XGBClassifier")
+    model = XGBClassifier(scale_pos_weight=scale_pos_weight, **used_params)
     model.fit(X_train, y_train, verbose=False)
     log.info("Training complete")
 
@@ -223,6 +324,7 @@ def main() -> None:
         "threshold": optimal_threshold,
         "version": MODEL_VERSION,
         "amount_stats": amount_stats,
+        "hyperparameters": used_params,
     }
     joblib.dump(bundle, MODEL_OUT)
     log.info("Model bundle saved → %s", MODEL_OUT)
@@ -275,7 +377,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
-        main()
+        main(parse_args())
     except Exception as exc:
         log.error("Training failed: %s", exc, exc_info=True)
         sys.exit(1)
