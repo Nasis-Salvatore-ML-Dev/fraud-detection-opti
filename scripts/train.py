@@ -8,6 +8,7 @@ evaluates on last 20%, and saves the model bundle + SHAP background sample.
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -53,7 +54,13 @@ MODEL_DIR = REPO_ROOT / "models"
 BASELINE_DIR = REPO_ROOT / "data" / "baselines"
 
 MODEL_OUT = MODEL_DIR / "xgboost_fraud_v1.pkl"
+ONNX_OUT = MODEL_DIR / "model.onnx"
 SHAP_OUT = BASELINE_DIR / "shap_background.pkl"
+
+_DEFAULT_S3_BUCKET = "fraud-model-artifacts-209998132741"
+_ONNX_S3_KEY = "models/model.onnx"
+_EQUIVALENCE_ROWS = 100
+_EQUIVALENCE_TOL = 1e-4
 
 MODEL_VERSION = "xgboost_fraud_v1"
 DEFAULT_THRESHOLD = 0.5
@@ -82,6 +89,74 @@ SHAP_BG_SEED = 0
 TUNE_N_TRIALS = 100
 # Inner split for Optuna: 75 % of the 80 % training slice = 60 % of total
 _TUNE_INNER_FRAC = 0.75
+
+
+# ---------------------------------------------------------------------------
+# ONNX export helpers
+# ---------------------------------------------------------------------------
+class OnnxEquivalenceError(RuntimeError):
+    """Raised when the ONNX model output diverges from XGBoost beyond tolerance."""
+
+
+def _export_onnx(
+    model,
+    feature_names: list[str],
+    X_val: pd.DataFrame,
+) -> bytes:
+    """Convert model to ONNX, verify equivalence on real rows, return bytes.
+
+    Raises RuntimeError if the max absolute difference between XGBoost and
+    ONNX probabilities exceeds _EQUIVALENCE_TOL.
+    """
+    from skl2onnx import convert_sklearn
+    from skl2onnx.common.data_types import FloatTensorType
+    import onnxruntime as ort
+
+    n_features = len(feature_names)
+    onnx_model = convert_sklearn(
+        model,
+        initial_types=[("X", FloatTensorType([None, n_features]))],
+        options={type(model): {"zipmap": False}},
+    )
+
+    check_rows = min(_EQUIVALENCE_ROWS, len(X_val))
+    X_check = X_val.iloc[:check_rows].values.astype(np.float32)
+
+    proba_xgb = model.predict_proba(X_check)[:, 1]
+
+    sess = ort.InferenceSession(onnx_model.SerializeToString())
+    input_name = sess.get_inputs()[0].name
+    proba_onnx = sess.run(None, {input_name: X_check})[1][:, 1]
+
+    max_diff = float(np.abs(proba_xgb - proba_onnx).max())
+    log.debug("ONNX equivalence: max_abs_diff=%.2e on %d rows", max_diff, check_rows)
+
+    if max_diff >= _EQUIVALENCE_TOL:
+        log.error(
+            "ONNX equivalence check FAILED: max_abs_diff=%.2e >= tol=%.2e",
+            max_diff,
+            _EQUIVALENCE_TOL,
+        )
+        raise OnnxEquivalenceError(
+            f"ONNX equivalence check failed: max abs diff {max_diff:.2e} >= {_EQUIVALENCE_TOL:.2e}. "
+            "Refusing to save a mismatched ONNX model."
+        )
+
+    log.info("ONNX equivalence OK: max_abs_diff=%.2e on %d rows", max_diff, check_rows)
+    return onnx_model.SerializeToString()
+
+
+def _upload_onnx_to_s3(local_path: Path, bucket: str, key: str) -> None:
+    """Upload local_path to S3; logs warning on failure, never raises."""
+    try:
+        import boto3
+
+        region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+        s3 = boto3.client("s3", region_name=region)
+        s3.upload_file(str(local_path), bucket, key)
+        log.info("ONNX model uploaded → s3://%s/%s", bucket, key)
+    except Exception as exc:
+        log.warning("S3 upload of ONNX model failed (non-fatal): %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -373,6 +448,23 @@ def main(args=None) -> None:
     with open(BASELINE_OUT, "w") as f:
         json.dump(psi_baseline, f, indent=2)
     log.info("PSI baseline saved → %s", BASELINE_OUT)
+
+    # ── 10. ONNX export + equivalence check ──────────────────────────────
+    log.info("Exporting model to ONNX and verifying numerical equivalence")
+    try:
+        onnx_bytes = _export_onnx(model, feature_cols, X_test)
+        MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        with open(ONNX_OUT, "wb") as f:
+            f.write(onnx_bytes)
+        log.info("ONNX model saved → %s  (%d bytes)", ONNX_OUT, ONNX_OUT.stat().st_size)
+
+        # ── 11. Upload ONNX to S3 ─────────────────────────────────────────
+        s3_bucket = os.environ.get("MODEL_S3_BUCKET", _DEFAULT_S3_BUCKET)
+        _upload_onnx_to_s3(ONNX_OUT, s3_bucket, _ONNX_S3_KEY)
+    except OnnxEquivalenceError:
+        raise  # equivalence mismatch → abort; do not ship a bad ONNX model
+    except Exception as exc:
+        log.error("ONNX export failed — model.onnx not written: %s", exc)
 
 
 if __name__ == "__main__":
