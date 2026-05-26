@@ -1,0 +1,51 @@
+{
+  "model_version": "xgboost_fraud_v1",
+  "overall_auprc": 0.0743,
+  "overall_recall": 0.0,
+  "overall_fpr": 0.0,
+  "fpr_parity_threshold": 0.0,
+  "bias_segments": [
+    {
+      "segment": "high_amount",
+      "description": "Amount > 1000",
+      "n_samples": 100,
+      "n_fraud": 30,
+      "auprc": 0.2533,
+      "fpr": 0.0,
+      "flagged": false,
+      "fpr_flagged": false
+    },
+    {
+      "segment": "low_amount",
+      "description": "Amount <= 1000",
+      "n_samples": 500,
+      "n_fraud": 13,
+      "auprc": 0.0349,
+      "fpr": 0.0,
+      "flagged": true,
+      "fpr_flagged": false
+    },
+    {
+      "segment": "high_hour",
+      "description": "hour_of_day >= 18  (evening)",
+      "n_samples": 177,
+      "n_fraud": 12,
+      "auprc": 0.084,
+      "fpr": 0.0,
+      "flagged": false,
+      "fpr_flagged": false
+    },
+    {
+      "segment": "low_hour",
+      "description": "hour_of_day < 18   (daytime)",
+      "n_samples": 423,
+      "n_fraud": 31,
+      "auprc": 0.0767,
+      "fpr": 0.0,
+      "flagged": false,
+      "fpr_flagged": false
+    }
+  ],
+  "computed_at": "2026-05-18T19:47:00.738748+00:00",
+  "recommendation": "Performance gap detected in segments: low_amount. Investigate training-data distribution or collect more samples for these groups."
+}

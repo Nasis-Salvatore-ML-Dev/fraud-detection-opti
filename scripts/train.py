@@ -6,16 +6,20 @@ evaluates on last 20%, and saves the model bundle + SHAP background sample.
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
 import numpy as np
 import optuna
 import pandas as pd
+from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
@@ -56,8 +60,11 @@ BASELINE_DIR = REPO_ROOT / "data" / "baselines"
 MODEL_OUT = MODEL_DIR / "xgboost_fraud_v1.pkl"
 ONNX_OUT = MODEL_DIR / "model.onnx"
 SHAP_OUT = BASELINE_DIR / "shap_background.pkl"
+REPORTS_DIR = REPO_ROOT / "data" / "reports"
+MODEL_CARD_PATH = REPO_ROOT / "model_card.json"
 
 _DEFAULT_S3_BUCKET = "fraud-model-artifacts-209998132741"
+_PKL_S3_KEY = "models/xgboost_fraud_v1.pkl"
 _ONNX_S3_KEY = "models/model.onnx"
 _EQUIVALENCE_ROWS = 100
 _EQUIVALENCE_TOL = 1e-4
@@ -65,9 +72,19 @@ _EQUIVALENCE_TOL = 1e-4
 MODEL_VERSION = "xgboost_fraud_v1"
 DEFAULT_THRESHOLD = 0.5
 
-PSI_FEATURES = ["Amount", "amount_log", "amount_zscore", "hour_of_day"]
 PSI_N_BINS = 10
-BASELINE_OUT = BASELINE_DIR / "training_baseline.json"
+
+_REQUIRED_BUNDLE_KEYS = {
+    "model",
+    "feature_names",
+    "threshold",
+    "version",
+    "amount_stats",
+    "hyperparameters",
+    "experiment_manifest",
+    "psi_baseline",
+    "calibrator",
+}
 
 # ---------------------------------------------------------------------------
 # Fixed hyperparameters
@@ -157,6 +174,215 @@ def _upload_onnx_to_s3(local_path: Path, bucket: str, key: str) -> None:
         log.info("ONNX model uploaded → s3://%s/%s", bucket, key)
     except Exception as exc:
         log.warning("S3 upload of ONNX model failed (non-fatal): %s", exc)
+
+
+def _upload_model_card_to_s3(local_path: Path, bucket: str, version: str) -> None:
+    """Upload model_card.json to S3; logs warning on failure, never raises."""
+    key = f"model_cards/model_card_{version}.json"
+    try:
+        import boto3
+
+        region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+        s3 = boto3.client("s3", region_name=region)
+        s3.upload_file(str(local_path), bucket, key)
+        log.info("Model card uploaded → s3://%s/%s", bucket, key)
+    except Exception as exc:
+        log.warning("S3 upload of model card failed (non-fatal): %s", exc)
+
+
+def _compute_git_sha() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _compute_dataset_hash(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _compute_psi_baseline(X_train: pd.DataFrame, y_prob_train: np.ndarray) -> dict:
+    """Build a per-feature PSI baseline for all training features + fraud_probability."""
+    psi_baseline: dict = {}
+    feature_values: dict = {col: X_train[col].dropna().values for col in X_train.columns}
+    feature_values["fraud_probability"] = y_prob_train
+
+    for feature, values in feature_values.items():
+        bin_edges = np.unique(np.percentile(values, np.linspace(0, 100, PSI_N_BINS + 1)))
+        if len(bin_edges) < 2:
+            log.warning("Feature %r has no variance — skipping PSI.", feature)
+            continue
+        bin_edges[0] -= 1e-9
+        bin_edges[-1] += 1e-9
+        counts, _ = np.histogram(values, bins=bin_edges)
+        psi_baseline[feature] = {
+            "bin_edges": bin_edges.tolist(),
+            "expected_proportions": (counts / counts.sum()).tolist(),
+        }
+        log.debug("PSI: %s  %d bins", feature, len(bin_edges) - 1)
+
+    log.info("PSI baseline computed for %d features", len(psi_baseline))
+    return psi_baseline
+
+
+def _fit_calibrator(y_prob: np.ndarray, y_true: np.ndarray) -> IsotonicRegression:
+    """Fit an isotonic regression calibrator and verify ordering on the same split."""
+    calibrator = IsotonicRegression(out_of_bounds="clip")
+    calibrator.fit(y_prob, y_true)
+
+    y_cal = calibrator.predict(y_prob)
+    fraud_mask = y_true == 1
+    legit_mask = y_true == 0
+
+    if fraud_mask.any() and legit_mask.any():
+        mean_fraud = float(y_cal[fraud_mask].mean())
+        mean_legit = float(y_cal[legit_mask].mean())
+        if mean_fraud <= mean_legit:
+            log.warning(
+                "Calibration check failed: mean fraud prob (%.4f) not > mean legit prob (%.4f)",
+                mean_fraud,
+                mean_legit,
+            )
+        else:
+            log.info(
+                "Calibration check OK: mean fraud prob=%.4f > mean legit prob=%.4f",
+                mean_fraud,
+                mean_legit,
+            )
+
+    return calibrator
+
+
+def _generate_model_card(manifest: dict, version: str, bias_report_path: Path) -> dict:
+    """Build a Mitchell et al. model card dict from the experiment manifest."""
+    metrics = manifest.get("metrics", {})
+
+    bias_segments: list = []
+    bias_computed_at = None
+    bias_recommendation = None
+    if bias_report_path.exists():
+        try:
+            with open(bias_report_path) as f:
+                bias_report = json.load(f)
+            bias_segments = bias_report.get("bias_segments", [])
+            bias_computed_at = bias_report.get("computed_at")
+            bias_recommendation = bias_report.get("recommendation")
+            log.info(
+                "Bias report loaded — %d segment(s), computed_at=%s",
+                len(bias_segments),
+                bias_computed_at,
+            )
+        except Exception as exc:
+            log.warning("Could not load bias report (non-fatal): %s", exc)
+
+    return {
+        "model_details": {
+            "name": "fraud-detection-xgboost",
+            "version": version,
+            "type": "XGBClassifier",
+            "task": "binary_classification",
+            "framework": "XGBoost 2.x + scikit-learn wrapper",
+            "git_sha": manifest.get("git_sha"),
+            "trained_at": manifest.get("trained_at"),
+            "dataset_hash": manifest.get("dataset_hash"),
+            "description": (
+                "Gradient-boosted decision tree classifier that scores individual "
+                "credit-card transactions as fraudulent or legitimate. "
+                "Trained on PCA-anonymised features from the Kaggle Credit Card "
+                "Fraud Detection dataset."
+            ),
+        },
+        "intended_use": {
+            "primary_use": (
+                "Real-time fraud scoring for European credit-card transactions. "
+                "Intended as a decision-support tool for fraud analysts."
+            ),
+            "out_of_scope": [
+                "Automated account closure decisions without human review.",
+                "Scoring transactions outside European card networks.",
+                "Any use where PCA feature identities are assumed known.",
+            ],
+        },
+        "factors": {
+            "relevant_factors": [
+                "Transaction amount (Amount)",
+                "Hour of day derived from elapsed time (hour_of_day)",
+                "V1–V28: PCA-transformed card-network features (identities withheld by Kaggle)",
+            ],
+            "evaluation_factors": [
+                "Amount segment: high (>$1000) vs. low (≤$1000)",
+                "Time segment: evening (≥18:00) vs. daytime (<18:00)",
+            ],
+        },
+        "metrics": {
+            "performance_measures": ["AUPRC", "Recall", "False Positive Rate"],
+            "decision_threshold": metrics.get("threshold"),
+            "results": {
+                "auprc": metrics.get("auprc"),
+                "recall": metrics.get("recall"),
+                "fpr": metrics.get("fpr"),
+                "note": "Metrics from experiment manifest on 20% temporal hold-out.",
+            },
+            "bias_results": {
+                "computed_at": bias_computed_at,
+                "segments": bias_segments,
+                "recommendation": bias_recommendation,
+            },
+        },
+        "evaluation_data": {
+            "dataset": "Kaggle Credit Card Fraud Detection",
+            "source": "https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud",
+            "split": "Chronological 80/20 — first 80% train, last 20% test",
+            "time_coverage": "2 days of European transactions (Sept 2013)",
+            "preprocessing": (
+                "No scaling applied to V1–V28 (already PCA-transformed). "
+                "Amount log-transformed (log1p) and z-scored using training-set statistics. "
+                "Hour of day derived from elapsed seconds modulo 86400."
+            ),
+        },
+        "ethical_considerations": [
+            "No personally identifiable information in training data — "
+            "all card-network features are PCA-anonymised by the dataset provider.",
+            "FPR parity tested across Amount (high/low) and time-of-day (evening/daytime) segments. "
+            "Segments with FPR > 2× overall FPR are flagged for review.",
+            "Uncertain predictions (fraud probability 0.3–0.7) are automatically routed to a "
+            "human override queue rather than acted on autonomously.",
+            "EU AI Act Annex III classification: high-risk system (financial services). "
+            "Requires human oversight, audit logging, and conformity assessment before deployment.",
+        ],
+        "caveats": [
+            "Dataset covers only 2 days — model may not generalise to seasonal fraud patterns "
+            "or novel attack vectors that emerged after Sept 2013.",
+            "V1–V28 are PCA components of undisclosed features, preventing direct feature "
+            "interpretation or manual override based on individual feature values.",
+            "Decision threshold tuned for high recall (≥0.90) on the test set. "
+            "Expect higher FPR in production due to distribution shift over time.",
+            "PSI drift monitoring covers all 32 engineered features plus fraud_probability.",
+        ],
+        "mlops": {
+            "platform": "AWS Lambda (container image) + API Gateway",
+            "audit_log": "DynamoDB table  fraud-audit-log  (permanent TTL)",
+            "override_queue": "DynamoDB table  fraud-override-queue  (30-day TTL)",
+            "drift_detection": "PSI on all features + fraud_probability; "
+            "alert thresholds stable < 0.10 < monitor < 0.20 < action_required",
+            "bias_testing": "Per-segment AUPRC and FPR parity; gates CD pipeline via "
+            "scripts/run_bias_test.py (exit 1 on failure)",
+            "ci_cd": "GitHub Actions — CI on PR, CD on merge to main",
+        },
+        "generated_at": manifest.get("trained_at"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -391,19 +617,6 @@ def main(args=None) -> None:
         )
         print(f"  [WARNING] No threshold found; using fallback {DEFAULT_THRESHOLD}")
 
-    # ── 7. Save model bundle ──────────────────────────────────────────────
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    bundle = {
-        "model": model,
-        "feature_names": feature_cols,
-        "threshold": optimal_threshold,
-        "version": MODEL_VERSION,
-        "amount_stats": amount_stats,
-        "hyperparameters": used_params,
-    }
-    joblib.dump(bundle, MODEL_OUT)
-    log.info("Model bundle saved → %s", MODEL_OUT)
-
     # ── 8. SHAP background sample ─────────────────────────────────────────
     BASELINE_DIR.mkdir(parents=True, exist_ok=True)
     bg, n_bg_fraud = sample_shap_background(X_train, y_train)
@@ -415,41 +628,72 @@ def main(args=None) -> None:
         n_bg_fraud,
     )
 
-    # ── 9. PSI baseline ───────────────────────────────────────────────────
-    log.info("Computing PSI baseline for features: %s", PSI_FEATURES)
-    psi_baseline: dict = {}
-    for feature in PSI_FEATURES:
-        values = X_train[feature].dropna().values
-        bin_edges = np.unique(np.percentile(values, np.linspace(0, 100, PSI_N_BINS + 1)))
-        if len(bin_edges) < 2:
-            log.warning("Feature %r has no variance — skipping.", feature)
-            continue
-        bin_edges[0] = bin_edges[0] - 1e-9
-        bin_edges[-1] = bin_edges[-1] + 1e-9
-        counts, _ = np.histogram(values, bins=bin_edges)
-        proportions = (counts / counts.sum()).tolist()
-        psi_baseline[feature] = {
-            "bin_edges": bin_edges.tolist(),
-            "expected_proportions": proportions,
-            "n_samples": int(len(values)),
-            "mean": float(np.mean(values)),
-            "std": float(np.std(values)),
-            "p5": float(np.percentile(values, 5)),
-            "p95": float(np.percentile(values, 95)),
-        }
-        log.info(
-            "  %s: %d bins, mean=%.4f, std=%.4f",
-            feature,
-            len(bin_edges) - 1,
-            psi_baseline[feature]["mean"],
-            psi_baseline[feature]["std"],
-        )
+    # ── 9. Full PSI baseline (all features + fraud_probability) ──────────
+    log.info("Computing PSI baseline for %d features + fraud_probability", len(feature_cols))
+    y_prob_train = model.predict_proba(X_train)[:, 1]
+    psi_baseline = _compute_psi_baseline(X_train, y_prob_train)
 
-    with open(BASELINE_OUT, "w") as f:
-        json.dump(psi_baseline, f, indent=2)
-    log.info("PSI baseline saved → %s", BASELINE_OUT)
+    # ── 10. Isotonic calibrator (fitted on test / validation set) ─────────
+    log.info("Fitting isotonic calibrator on validation set")
+    calibrator = _fit_calibrator(y_prob, y_test.values)
 
-    # ── 10. ONNX export + equivalence check ──────────────────────────────
+    # ── 11. Experiment manifest ────────────────────────────────────────────
+    log.info("Building experiment manifest")
+    git_sha = _compute_git_sha()
+    dataset_hash = _compute_dataset_hash(DATA_PATH)
+    s3_bucket = os.environ.get("MODEL_S3_BUCKET", _DEFAULT_S3_BUCKET)
+    manifest = {
+        "git_sha": git_sha,
+        "dataset_hash": dataset_hash,
+        "hyperparameters": used_params,
+        "metrics": {
+            "auprc": float(auprc),
+            "recall": float(recall),
+            "fpr": float(fpr),
+            "threshold": float(optimal_threshold),
+        },
+        "s3_paths": {
+            "model_pkl": _PKL_S3_KEY,
+            "model_onnx": _ONNX_S3_KEY,
+        },
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+    }
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    manifest_path = REPORTS_DIR / "experiment_manifest.json"
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+    log.info("Experiment manifest saved → %s", manifest_path)
+
+    # ── 12. Model card ─────────────────────────────────────────────────────
+    log.info("Generating model card")
+    bias_report_path = REPORTS_DIR / "bias_report.json"
+    card = _generate_model_card(manifest, MODEL_VERSION, bias_report_path)
+    with open(MODEL_CARD_PATH, "w") as f:
+        json.dump(card, f, indent=2)
+    log.info("Model card saved → %s", MODEL_CARD_PATH)
+    _upload_model_card_to_s3(MODEL_CARD_PATH, s3_bucket, MODEL_VERSION)
+
+    # ── 13. Bundle key assertion + save ────────────────────────────────────
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    bundle = {
+        "model": model,
+        "feature_names": feature_cols,
+        "threshold": optimal_threshold,
+        "version": MODEL_VERSION,
+        "amount_stats": amount_stats,
+        "hyperparameters": used_params,
+        "experiment_manifest": manifest,
+        "psi_baseline": psi_baseline,
+        "calibrator": calibrator,
+    }
+    missing_keys = _REQUIRED_BUNDLE_KEYS - set(bundle.keys())
+    if missing_keys:
+        log.error("Model bundle missing required keys: %s", sorted(missing_keys))
+        raise RuntimeError(f"Model bundle missing keys: {sorted(missing_keys)}")
+    joblib.dump(bundle, MODEL_OUT)
+    log.info("Model bundle saved → %s", MODEL_OUT)
+
+    # ── 14. ONNX export + equivalence check ───────────────────────────────
     log.info("Exporting model to ONNX and verifying numerical equivalence")
     try:
         onnx_bytes = _export_onnx(model, feature_cols, X_test)
@@ -458,8 +702,7 @@ def main(args=None) -> None:
             f.write(onnx_bytes)
         log.info("ONNX model saved → %s  (%d bytes)", ONNX_OUT, ONNX_OUT.stat().st_size)
 
-        # ── 11. Upload ONNX to S3 ─────────────────────────────────────────
-        s3_bucket = os.environ.get("MODEL_S3_BUCKET", _DEFAULT_S3_BUCKET)
+        # ── 15. Upload ONNX to S3 ─────────────────────────────────────────
         _upload_onnx_to_s3(ONNX_OUT, s3_bucket, _ONNX_S3_KEY)
     except OnnxEquivalenceError:
         raise  # equivalence mismatch → abort; do not ship a bad ONNX model

@@ -1,0 +1,121 @@
+{
+  "model_details": {
+    "name": "fraud-detection-xgboost",
+    "version": "xgboost_fraud_v1",
+    "type": "XGBClassifier",
+    "task": "binary_classification",
+    "framework": "XGBoost 2.x + scikit-learn wrapper",
+    "description": "Gradient-boosted decision tree classifier that scores individual credit-card transactions as fraudulent or legitimate. Trained on PCA-anonymised features from the Kaggle Credit Card Fraud Detection dataset."
+  },
+  "intended_use": {
+    "primary_use": "Real-time fraud scoring for European credit-card transactions. Intended as a decision-support tool for fraud analysts.",
+    "out_of_scope": [
+      "Automated account closure decisions without human review.",
+      "Scoring transactions outside European card networks.",
+      "Any use where PCA feature identities are assumed known."
+    ]
+  },
+  "factors": {
+    "relevant_factors": [
+      "Transaction amount (Amount)",
+      "Hour of day derived from elapsed time (hour_of_day)",
+      "V1\u2013V28: PCA-transformed card-network features (identities withheld by Kaggle)"
+    ],
+    "evaluation_factors": [
+      "Amount segment: high (>$1000) vs. low (\u2264$1000)",
+      "Time segment: evening (\u226518:00) vs. daytime (<18:00)"
+    ]
+  },
+  "metrics": {
+    "performance_measures": [
+      "AUPRC",
+      "Recall",
+      "False Positive Rate"
+    ],
+    "decision_threshold": 0.5,
+    "results": {
+      "auprc": 0.7942,
+      "recall": 0.76,
+      "fpr": 0.000141,
+      "note": "Phase-1 baseline on 20% temporal hold-out. Updated on each retrain."
+    },
+    "bias_results": {
+      "computed_at": "2026-05-18T18:32:23.159779+00:00",
+      "segments": [
+        {
+          "segment": "high_amount",
+          "description": "Amount > 1000",
+          "n_samples": 100,
+          "n_fraud": 27,
+          "auprc": 0.3374,
+          "fpr": 0.0,
+          "flagged": false,
+          "fpr_flagged": false
+        },
+        {
+          "segment": "low_amount",
+          "description": "Amount <= 1000",
+          "n_samples": 500,
+          "n_fraud": 11,
+          "auprc": 0.0206,
+          "fpr": 0.0,
+          "flagged": true,
+          "fpr_flagged": false
+        },
+        {
+          "segment": "high_hour",
+          "description": "hour_of_day >= 18  (evening)",
+          "n_samples": 177,
+          "n_fraud": 16,
+          "auprc": 0.1057,
+          "fpr": 0.0,
+          "flagged": false,
+          "fpr_flagged": false
+        },
+        {
+          "segment": "low_hour",
+          "description": "hour_of_day < 18   (daytime)",
+          "n_samples": 423,
+          "n_fraud": 22,
+          "auprc": 0.065,
+          "fpr": 0.0,
+          "flagged": false,
+          "fpr_flagged": false
+        }
+      ],
+      "recommendation": "Performance gap detected in segments: low_amount. Investigate training-data distribution or collect more samples for these groups."
+    }
+  },
+  "evaluation_data": {
+    "dataset": "Kaggle Credit Card Fraud Detection",
+    "source": "https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud",
+    "total_transactions": 284807,
+    "fraud_cases": 492,
+    "fraud_rate_pct": 0.1727,
+    "split": "Chronological 80/20 \u2014 first 80% train, last 20% test",
+    "time_coverage": "2 days of European transactions (Sept 2013)",
+    "preprocessing": "No scaling applied to V1\u2013V28 (already PCA-transformed). Amount log-transformed (log1p) and z-scored using training-set statistics. Hour of day derived from elapsed seconds modulo 86400."
+  },
+  "ethical_considerations": [
+    "No personally identifiable information in training data \u2014 all card-network features are PCA-anonymised by the dataset provider.",
+    "FPR parity tested across Amount (high/low) and time-of-day (evening/daytime) segments. Segments with FPR > 2\u00d7 overall FPR are flagged for review.",
+    "Uncertain predictions (fraud probability 0.3\u20130.7) are automatically routed to a human override queue rather than acted on autonomously.",
+    "EU AI Act Annex III classification: high-risk system (financial services). Requires human oversight, audit logging, and conformity assessment before deployment."
+  ],
+  "caveats": [
+    "Dataset covers only 2 days \u2014 model may not generalise to seasonal fraud patterns or novel attack vectors that emerged after Sept 2013.",
+    "V1\u2013V28 are PCA components of undisclosed features, preventing direct feature interpretation or manual override based on individual feature values.",
+    "Decision threshold tuned for high recall (\u22650.90) on the test set. Expect higher FPR in production due to distribution shift over time.",
+    "PSI drift monitoring covers only the four engineered features (Amount, amount_log, amount_zscore, hour_of_day), not the 28 PCA components."
+  ],
+  "mlops": {
+    "platform": "AWS Lambda (container image) + API Gateway",
+    "audit_log": "DynamoDB table  fraud-audit-log  (permanent TTL)",
+    "override_queue": "DynamoDB table  fraud-override-queue  (30-day TTL)",
+    "drift_detection": "PSI on Amount, amount_log, amount_zscore, hour_of_day; alert thresholds stable < 0.10 < monitor < 0.20 < action_required",
+    "bias_testing": "Per-segment AUPRC and FPR parity; gates CD pipeline via scripts/run_bias_test.py (exit 1 on failure)",
+    "ci_cd": "GitHub Actions \u2014 CI on PR, CD on merge to main",
+    "model_registry": "s3://fraud-detection-models/xgboost_fraud_v1.pkl"
+  },
+  "generated_at": "2026-05-18T19:46:36.532927+00:00"
+}
