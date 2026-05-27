@@ -104,5 +104,34 @@ aws dynamodb update-time-to-live \
 
 echo "[OK]      $TABLE_SHAP  (TTL: expires_at)"
 
+# ---------------------------------------------------------------------------
+# 3. fraud-config
+#    PK: config_key (S)
+#    Billing: PAY_PER_REQUEST
+#    Seed: threshold = 0.5 (written only on first table creation)
+# ---------------------------------------------------------------------------
+TABLE_CONFIG="fraud-config"
+
+if aws dynamodb create-table \
+    --table-name "$TABLE_CONFIG" \
+    --region "$REGION" \
+    --billing-mode PAY_PER_REQUEST \
+    --attribute-definitions \
+        AttributeName=config_key,AttributeType=S \
+    --key-schema \
+        AttributeName=config_key,KeyType=HASH \
+    --output text \
+    --query "TableDescription.TableName" \
+    > /dev/null 2>&1; then
+    aws dynamodb put-item \
+        --table-name "$TABLE_CONFIG" \
+        --region "$REGION" \
+        --item '{"config_key": {"S": "threshold"}, "value": {"S": "0.5"}}' \
+        --condition-expression "attribute_not_exists(config_key)" \
+        > /dev/null 2>&1 || true
+fi
+
+echo "[OK]      $TABLE_CONFIG  (seed: threshold=0.5)"
+
 echo ""
 echo "DynamoDB setup complete."

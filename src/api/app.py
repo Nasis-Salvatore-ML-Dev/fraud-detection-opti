@@ -2,12 +2,14 @@
 
 import hashlib
 import logging
+import os
 import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+import boto3
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,7 @@ from src.api.middleware import LoggingMiddleware
 from src.api.preprocessing import build_feature_dataframe, set_amount_stats
 from src.api.schemas import (
     BiasReportResponse,
+    ConfigUpdateRequest,
     DriftReportResponse,
     HealthResponse,
     PredictionRequest,
@@ -26,6 +29,7 @@ from src.api.schemas import (
 from src.monitoring.audit_logger import AuditLogger
 from src.monitoring.bias_tester import BiasTestSuite
 from src.monitoring.drift import DriftMonitor
+from src.utils import model_loader as _model_loader
 from src.utils.model_loader import ModelBundle, load_model_bundle
 
 # ---------------------------------------------------------------------------
@@ -57,6 +61,13 @@ _bias: BiasTestSuite | None = None
 # whose C-extension ABI is incompatible with the shap wheel built locally.
 # Re-enable by building shap inside the container image and setting SHAP_ENABLED=1.
 _SHAP_ENABLED = False
+
+
+def _effective_threshold(active_threshold: float, hour_of_day: float) -> float:
+    """Return tightened threshold during high-risk hours (1 AM to 5 AM inclusive)."""
+    if int(hour_of_day) in (1, 2, 3, 4, 5):
+        return round(active_threshold * 0.85, 4)
+    return active_threshold
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +164,26 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
 
     processing_time_ms = (time.perf_counter() - t0) * 1000
 
-    is_fraud = fraud_probability >= _bundle.threshold
+    # Calibrated confidence score from isotonic regression calibrator
+    calibrator = _bundle.calibrator
+    if calibrator is not None:
+        confidence_score = float(calibrator.transform([fraud_probability])[0])
+    else:
+        log.warning("No calibrator in bundle; using raw probability as confidence_score")
+        confidence_score = fraud_probability
+
+    # Time-aware threshold tightening
+    hour_of_day = float(features["hour_of_day"].iloc[0])
+    effective_thr = _effective_threshold(_model_loader._active_threshold, hour_of_day)
+
+    is_fraud = fraud_probability >= effective_thr
     flagged_for_review = 0.3 <= fraud_probability <= 0.7
-    confidence_score = 0.9 if (fraud_probability >= 0.7 or fraud_probability <= 0.3) else 0.4
 
     prediction_id = str(uuid.uuid4())
+    log.debug(
+        "prediction_id=%s effective_threshold=%.4f hour_of_day=%.0f",
+        prediction_id, effective_thr, hour_of_day,
+    )
     request_ip = req.client.host if req.client else "unknown"
 
     # SHA-256 of the ordered feature vector — consistent with shap_offline.py
@@ -184,7 +210,7 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         confidence_score=confidence_score,
         request_ip=request_ip,
         latency_ms=processing_time_ms,
-        threshold_used=_bundle.threshold,
+        threshold_used=effective_thr,
     )
 
     if flagged_for_review:
@@ -217,7 +243,8 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         model_version=_bundle.version,
         processing_time_ms=processing_time_ms,
         flagged_for_review=flagged_for_review,
-        threshold_used=_bundle.threshold,
+        threshold_used=effective_thr,
+        effective_threshold=effective_thr,
         anomaly_flags=payload.anomaly_flags,
         high_amount_flag=payload.high_amount_flag,
     )
@@ -247,6 +274,41 @@ async def list_pending_reviews() -> list[dict]:
         raise HTTPException(status_code=503, detail="Service not ready")
 
     return await _audit.fetch_pending_reviews()
+
+
+@app.get("/config")
+def get_config() -> dict:
+    """Return the current decision threshold and its source."""
+    return {
+        "threshold": _model_loader._active_threshold,
+        "source": _model_loader._threshold_source,
+    }
+
+
+@app.post("/config")
+async def update_config(payload: ConfigUpdateRequest, req: Request) -> dict:
+    """Update the decision threshold at runtime (requires X-Config-Api-Key header)."""
+    api_key = os.environ.get("CONFIG_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="CONFIG_API_KEY not configured")
+    if req.headers.get("X-Config-Api-Key") != api_key:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    config_table = os.environ.get("CONFIG_TABLE", "fraud-config")
+    region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+
+    try:
+        dynamo = boto3.resource("dynamodb", region_name=region)
+        dynamo.Table(config_table).put_item(
+            Item={"config_key": "threshold", "value": str(payload.threshold)}
+        )
+    except Exception as exc:
+        log.error("Failed to write threshold to DynamoDB: %s", exc)
+        raise HTTPException(status_code=503, detail="Failed to update config")
+
+    _model_loader.refresh_threshold()
+
+    return {"threshold": _model_loader._active_threshold, "updated": True}
 
 
 @app.get("/drift", response_model=DriftReportResponse)

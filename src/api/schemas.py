@@ -172,8 +172,15 @@ class PredictionResponse(BaseModel):
         description="True when fraud_probability is in [0.3, 0.7] (uncertain region)"
     )
     threshold_used: float
+    effective_threshold: float = 0.0
     anomaly_flags: list[str] = Field(default_factory=list)
     high_amount_flag: bool = False
+
+
+class ConfigUpdateRequest(BaseModel):
+    """Request body for updating the decision threshold at runtime."""
+
+    threshold: float = Field(gt=0, lt=1, description="Decision threshold, must be in (0, 1)")
 
 
 class OverrideRequest(BaseModel):

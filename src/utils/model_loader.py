@@ -38,6 +38,10 @@ _S3_BASELINE_KEY = "baselines/training_baseline.json"
 
 _REQUIRED_KEYS = {"model", "feature_names", "threshold", "version"}
 
+# Runtime-adjustable decision threshold — updated at startup and via /config.
+_active_threshold: float = 0.5
+_threshold_source: str = "bundle"
+
 
 @dataclass
 class ModelBundle:
@@ -46,6 +50,8 @@ class ModelBundle:
     threshold: float
     version: str
     amount_stats: dict = field(default_factory=dict)
+    psi_baseline: dict = field(default_factory=dict)
+    calibrator: Any = field(default=None)
     # Set after construction by load_model_bundle(); excluded from __init__
     _onnx_session: Any = field(default=None, init=False, repr=False)
     _onnx_input_name: str = field(default="", init=False, repr=False)
@@ -67,6 +73,53 @@ class ModelBundle:
         raise RuntimeError(
             "No model available for inference — neither ONNX session nor XGBoost pkl is loaded."
         )
+
+
+def _load_threshold_from_dynamodb(bundle_threshold: float) -> None:
+    """Load threshold from fraud-config DynamoDB table; fall back to bundle value."""
+    global _active_threshold, _threshold_source
+    import boto3
+
+    config_table = os.environ.get("CONFIG_TABLE", "fraud-config")
+    region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+
+    try:
+        dynamo = boto3.resource("dynamodb", region_name=region)
+        response = dynamo.Table(config_table).get_item(Key={"config_key": "threshold"})
+        item = response.get("Item")
+        if item is not None:
+            _active_threshold = float(item["value"])
+            _threshold_source = "dynamodb"
+            log.info("Threshold loaded from DynamoDB: %.4f", _active_threshold)
+            return
+    except Exception as exc:
+        log.warning("DynamoDB threshold lookup failed, falling back to bundle: %s", exc)
+
+    _active_threshold = bundle_threshold
+    _threshold_source = "bundle"
+    log.warning("Using bundle threshold: %.4f", _active_threshold)
+
+
+def refresh_threshold() -> float:
+    """Re-read threshold from DynamoDB and update _active_threshold. Never raises."""
+    global _active_threshold, _threshold_source
+    import boto3
+
+    config_table = os.environ.get("CONFIG_TABLE", "fraud-config")
+    region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+
+    try:
+        dynamo = boto3.resource("dynamodb", region_name=region)
+        response = dynamo.Table(config_table).get_item(Key={"config_key": "threshold"})
+        item = response.get("Item")
+        if item is not None:
+            _active_threshold = float(item["value"])
+            _threshold_source = "dynamodb"
+            log.info("Threshold refreshed from DynamoDB: %.4f", _active_threshold)
+    except Exception as exc:
+        log.warning("refresh_threshold failed (non-fatal): %s", exc)
+
+    return _active_threshold
 
 
 def _download_from_s3(bucket: str, key: str, dest: str) -> None:
@@ -191,6 +244,8 @@ def load_model_bundle() -> ModelBundle:
         threshold=bundle["threshold"],
         version=bundle["version"],
         amount_stats=bundle.get("amount_stats", {}),
+        psi_baseline=bundle.get("psi_baseline", {}),
+        calibrator=bundle.get("calibrator"),
     )
 
     # ── 2. Try ONNX for faster inference ──────────────────────────────────
@@ -209,6 +264,8 @@ def load_model_bundle() -> ModelBundle:
         result.threshold,
         result._onnx_session is not None,
     )
+
+    _load_threshold_from_dynamodb(result.threshold)
 
     return result
 
