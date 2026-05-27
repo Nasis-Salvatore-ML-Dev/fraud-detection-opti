@@ -1,5 +1,6 @@
 """Fraud detection API — FastAPI application deployed on AWS Lambda via Mangum."""
 
+import hashlib
 import logging
 import sys
 import time
@@ -7,6 +8,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -17,8 +19,6 @@ from src.api.schemas import (
     BiasReportResponse,
     DriftReportResponse,
     HealthResponse,
-    OverrideRequest,
-    OverrideResponse,
     PredictionRequest,
     PredictionResponse,
     register_validation_stats,
@@ -160,7 +160,13 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
     prediction_id = str(uuid.uuid4())
     request_ip = req.client.host if req.client else "unknown"
 
+    # SHA-256 of the ordered feature vector — consistent with shap_offline.py
+    feature_vector = features.iloc[0].values.astype(np.float64).tobytes()
+    prediction_hash = hashlib.sha256(feature_vector).hexdigest()
+
+    # All 32 features: V1-V28 (from payload) + engineered Amount features
     input_features = {
+        **{f"V{i}": float(getattr(payload, f"v{i}")) for i in range(1, 29)},
         "Amount": payload.amount,
         "amount_log": float(features["amount_log"].iloc[0]),
         "amount_zscore": float(features["amount_zscore"].iloc[0]),
@@ -169,6 +175,7 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
 
     await _audit.write(
         prediction_id=prediction_id,
+        prediction_hash=prediction_hash,
         input_features=input_features,
         fraud_probability=fraud_probability,
         is_fraud=is_fraud,
@@ -228,31 +235,18 @@ async def explain(prediction_id: str) -> dict:
     return record
 
 
-@app.post("/override", response_model=OverrideResponse)
-async def override(request: OverrideRequest) -> OverrideResponse:
-    """Record a human override decision for a flagged prediction."""
+@app.get("/override")
+async def list_pending_reviews() -> list[dict]:
+    """Return all predictions currently flagged for human review.
+
+    Queries the requires-review-index GSI on fraud-audit-log.
+    Each record includes prediction_id, fraud_probability, shap_top3,
+    amount, requires_review, and timestamp.
+    """
     if _audit is None:
         raise HTTPException(status_code=503, detail="Service not ready")
 
-    record = await _audit.fetch(request.prediction_id)
-    if record is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Prediction {request.prediction_id!r} not found",
-        )
-
-    await _audit.flag_override(
-        request.prediction_id,
-        reason=request.reason or "",
-        reviewer_notes=request.notes,
-    )
-    log.info("Override recorded for prediction_id=%s", request.prediction_id)
-
-    return OverrideResponse(
-        prediction_id=request.prediction_id,
-        status="overridden",
-        message="Prediction flagged for human review and override recorded.",
-    )
+    return await _audit.fetch_pending_reviews()
 
 
 @app.get("/drift", response_model=DriftReportResponse)
