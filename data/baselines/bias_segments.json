@@ -1,0 +1,34 @@
+[
+  {
+    "name": "high_amount",
+    "feature": "Amount",
+    "threshold": 1000,
+    "comparison": "gt",
+    "fpr_multiplier_limit": 1.5,
+    "auprc_ratio_limit": 0.7
+  },
+  {
+    "name": "low_amount",
+    "feature": "Amount",
+    "threshold": 1000,
+    "comparison": "lte",
+    "fpr_multiplier_limit": 2.0,
+    "auprc_ratio_limit": 0.7
+  },
+  {
+    "name": "evening_hour",
+    "feature": "hour_of_day",
+    "threshold": 18,
+    "comparison": "gte",
+    "fpr_multiplier_limit": 2.0,
+    "auprc_ratio_limit": 0.7
+  },
+  {
+    "name": "daytime_hour",
+    "feature": "hour_of_day",
+    "threshold": 18,
+    "comparison": "lt",
+    "fpr_multiplier_limit": 2.0,
+    "auprc_ratio_limit": 0.7
+  }
+]

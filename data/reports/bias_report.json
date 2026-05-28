@@ -1,51 +1,29 @@
 {
-  "model_version": "xgboost_fraud_v1",
-  "overall_auprc": 0.0743,
+  "model_version": "v1",
+  "overall_auprc": 0.2,
   "overall_recall": 0.0,
   "overall_fpr": 0.0,
-  "fpr_parity_threshold": 0.0,
   "bias_segments": [
     {
       "segment": "high_amount",
-      "description": "Amount > 1000",
-      "n_samples": 100,
-      "n_fraud": 30,
-      "auprc": 0.2533,
+      "description": "Amount > 500",
+      "n_samples": 50,
+      "n_fraud": 10,
+      "auprc": 0.2,
       "fpr": 0.0,
-      "flagged": false,
-      "fpr_flagged": false
-    },
-    {
-      "segment": "low_amount",
-      "description": "Amount <= 1000",
-      "n_samples": 500,
-      "n_fraud": 13,
-      "auprc": 0.0349,
-      "fpr": 0.0,
-      "flagged": true,
-      "fpr_flagged": false
-    },
-    {
-      "segment": "high_hour",
-      "description": "hour_of_day >= 18  (evening)",
-      "n_samples": 177,
-      "n_fraud": 12,
-      "auprc": 0.084,
-      "fpr": 0.0,
-      "flagged": false,
-      "fpr_flagged": false
-    },
-    {
-      "segment": "low_hour",
-      "description": "hour_of_day < 18   (daytime)",
-      "n_samples": 423,
-      "n_fraud": 31,
-      "auprc": 0.0767,
-      "fpr": 0.0,
-      "flagged": false,
-      "fpr_flagged": false
+      "auprc_ratio": 1.0,
+      "fpr_ratio": null,
+      "auprc_flagged": false,
+      "fpr_flagged": false,
+      "directional_bias_flagged": false,
+      "flagged": false
     }
   ],
-  "computed_at": "2026-05-18T19:47:00.738748+00:00",
-  "recommendation": "Performance gap detected in segments: low_amount. Investigate training-data distribution or collect more samples for these groups."
+  "summary": {
+    "n_segments_flagged": 0,
+    "directional_bias_detected": false,
+    "any_flagged": false
+  },
+  "computed_at": "2026-05-28T14:52:02.139950+00:00",
+  "recommendation": "No significant performance gaps detected across tested segments."
 }

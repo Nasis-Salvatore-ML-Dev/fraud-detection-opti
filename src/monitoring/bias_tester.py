@@ -1,12 +1,13 @@
 """Bias / fairness test suite for the fraud detection model.
 
-Segments predictions by transaction amount and time-of-day, then
-computes per-segment AUPRC to flag any meaningful performance gap
-relative to the overall model AUPRC.
+Segments predictions by transaction amount and time-of-day (config-driven),
+then computes per-segment AUPRC, FPR ratio, and directional bias to flag
+any meaningful performance gap relative to the overall model.
 """
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,20 +23,102 @@ log = logging.getLogger(__name__)
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _VALIDATION_PATH = _REPO_ROOT / "data" / "validation" / "validation_set.csv"
 _REPORTS_DIR = _REPO_ROOT / "data" / "reports"
-
-# Flag a segment when its AUPRC falls below this fraction of overall AUPRC
-_FLAG_RATIO = 0.7
-
-_SEGMENTS: list[tuple[str, str]] = [
-    ("high_amount", "Amount > 1000"),
-    ("low_amount", "Amount <= 1000"),
-    ("high_hour", "hour_of_day >= 18  (evening)"),
-    ("low_hour", "hour_of_day < 18   (daytime)"),
-]
+_DEFAULT_SEGMENTS_PATH = _REPO_ROOT / "data" / "baselines" / "bias_segments.json"
 
 # Fixed training-set normalisation constants (must match preprocessing.py)
 _AMOUNT_MEAN = 90.8249
 _AMOUNT_STD = 250.5032
+
+# A segment is directional-bias flagged when its mean predicted probability
+# exceeds this multiple of the overall mean predicted probability.
+_DIRECTIONAL_BIAS_MULTIPLIER = 1.5
+
+# Hardcoded fallback — used only when bias_segments.json cannot be loaded.
+_DEFAULT_SEGMENTS: list[dict] = [
+    {
+        "name": "high_amount",
+        "feature": "Amount",
+        "threshold": 1000,
+        "comparison": "gt",
+        "fpr_multiplier_limit": 1.5,
+        "auprc_ratio_limit": 0.7,
+    },
+    {
+        "name": "low_amount",
+        "feature": "Amount",
+        "threshold": 1000,
+        "comparison": "lte",
+        "fpr_multiplier_limit": 2.0,
+        "auprc_ratio_limit": 0.7,
+    },
+    {
+        "name": "evening_hour",
+        "feature": "hour_of_day",
+        "threshold": 18,
+        "comparison": "gte",
+        "fpr_multiplier_limit": 2.0,
+        "auprc_ratio_limit": 0.7,
+    },
+    {
+        "name": "daytime_hour",
+        "feature": "hour_of_day",
+        "threshold": 18,
+        "comparison": "lt",
+        "fpr_multiplier_limit": 2.0,
+        "auprc_ratio_limit": 0.7,
+    },
+]
+
+_OPS = {
+    "gt": lambda col, t: col > t,
+    "gte": lambda col, t: col >= t,
+    "lt": lambda col, t: col < t,
+    "lte": lambda col, t: col <= t,
+}
+
+_OP_SYMBOLS = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}
+
+
+def load_segments(path=None) -> list[dict]:
+    """Load bias segment definitions from a JSON file.
+
+    Resolution order:
+      1. ``path`` argument (if given)
+      2. ``BIAS_SEGMENTS_PATH`` environment variable
+      3. ``data/baselines/bias_segments.json``
+      4. Hardcoded ``_DEFAULT_SEGMENTS`` fallback (logs a warning)
+    """
+    if path is None:
+        env_path = os.environ.get("BIAS_SEGMENTS_PATH")
+        path = Path(env_path) if env_path else _DEFAULT_SEGMENTS_PATH
+    try:
+        with open(path) as f:
+            segments = json.load(f)
+        log.info("BiasTestSuite: loaded %d segments from %s", len(segments), path)
+        return segments
+    except Exception as exc:
+        log.warning(
+            "BiasTestSuite: failed to load segments from %s: %s — using defaults", path, exc
+        )
+        return _DEFAULT_SEGMENTS
+
+
+def _apply_segment_mask(df: pd.DataFrame, seg: dict) -> pd.Series:
+    """Return a boolean Series selecting rows that belong to *seg*."""
+    feature = seg["feature"]
+    threshold = seg["threshold"]
+    comparison = seg["comparison"]
+    op = _OPS.get(comparison)
+    if op is None:
+        raise ValueError(
+            f"Unknown comparison operator: {comparison!r}. Supported: gt, gte, lt, lte."
+        )
+    return op(df[feature], threshold)
+
+
+def _generate_description(seg: dict) -> str:
+    symbol = _OP_SYMBOLS.get(seg["comparison"], seg["comparison"])
+    return f"{seg['feature']} {symbol} {seg['threshold']}"
 
 
 def _engineer_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -48,15 +131,6 @@ def _engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     if "hour_of_day" not in df.columns:
         df["hour_of_day"] = (df["Time"] % 86400) / 3600
     return df
-
-
-def _segment_mask(df: pd.DataFrame, name: str) -> pd.Series:
-    return {
-        "high_amount": df["Amount"] > 1000,
-        "low_amount": df["Amount"] <= 1000,
-        "high_hour": df["hour_of_day"] >= 18,
-        "low_hour": df["hour_of_day"] < 18,
-    }[name]
 
 
 class BiasTestSuite:
@@ -93,10 +167,10 @@ class BiasTestSuite:
     # ------------------------------------------------------------------
 
     def run(self, validation_df: pd.DataFrame | None = None) -> dict:
-        """Compute per-segment AUPRC and return a dict matching BiasReportResponse.
+        """Compute per-segment bias metrics and return a report dict.
 
-        Uses the provided validation_df if given, otherwise the CSV loaded at init.
-        Returns the cached placeholder report if neither is available.
+        Uses *validation_df* when provided, otherwise the CSV loaded at init.
+        Returns the cached placeholder when neither data nor model is available.
         """
         df = validation_df if validation_df is not None else self._validation_df
 
@@ -118,36 +192,51 @@ class BiasTestSuite:
 
         # Overall metrics
         overall_auprc = float(average_precision_score(y, y_proba))
-        tn, fp, fn, tp = confusion_matrix(y, y_pred).ravel()
+        tn, fp, fn, tp = confusion_matrix(y, y_pred, labels=[0, 1]).ravel()
         overall_recall = float(tp / (tp + fn)) if (tp + fn) else 0.0
         overall_fpr = float(fp / (fp + tn)) if (fp + tn) else 0.0
+        overall_mean_prob = float(y_proba.mean())
 
-        auprc_floor = _FLAG_RATIO * overall_auprc
-        fpr_threshold = 2.0 * overall_fpr
+        segments = load_segments()
         bias_segments: list[dict] = []
         flagged_names: list[str] = []
+        any_directional_bias = False
 
-        for seg_name, description in _SEGMENTS:
-            mask = _segment_mask(df, seg_name)
+        for seg_config in segments:
+            seg_name = seg_config["name"]
+            description = _generate_description(seg_config)
+            fpr_multiplier_limit = seg_config["fpr_multiplier_limit"]
+            auprc_ratio_limit = seg_config["auprc_ratio_limit"]
+
+            try:
+                mask = _apply_segment_mask(df, seg_config)
+            except Exception as exc:
+                log.warning(
+                    "BiasTestSuite: segment %s mask error: %s — skipping", seg_name, exc
+                )
+                continue
+
             y_s = y[mask]
             p_s = y_proba[mask]
             n_samples = int(mask.sum())
             n_fraud = int(y_s.sum())
 
             if n_samples < 10 or n_fraud == 0:
-                bias_segments.append(
-                    {
-                        "segment": seg_name,
-                        "description": description,
-                        "n_samples": n_samples,
-                        "n_fraud": n_fraud,
-                        "auprc": None,
-                        "fpr": None,
-                        "flagged": False,
-                        "fpr_flagged": False,
-                        "note": "Insufficient fraud samples for AUPRC",
-                    }
-                )
+                bias_segments.append({
+                    "segment": seg_name,
+                    "description": description,
+                    "n_samples": n_samples,
+                    "n_fraud": n_fraud,
+                    "auprc": None,
+                    "fpr": None,
+                    "auprc_ratio": None,
+                    "fpr_ratio": None,
+                    "auprc_flagged": False,
+                    "fpr_flagged": False,
+                    "directional_bias_flagged": False,
+                    "flagged": False,
+                    "note": "Insufficient fraud samples for AUPRC",
+                })
                 continue
 
             seg_auprc = float(average_precision_score(y_s, p_s))
@@ -155,25 +244,53 @@ class BiasTestSuite:
             cm_s = confusion_matrix(y_s, y_pred_s, labels=[0, 1])
             tn_s, fp_s, fn_s, tp_s = cm_s.ravel()
             seg_fpr = float(fp_s / (fp_s + tn_s)) if (fp_s + tn_s) else 0.0
+            seg_mean_prob = float(p_s.mean())
 
-            auprc_flagged = seg_auprc < auprc_floor
-            fpr_flagged = seg_fpr > fpr_threshold
-            flagged = auprc_flagged or fpr_flagged
+            auprc_ratio = (seg_auprc / overall_auprc) if overall_auprc > 0 else None
+            fpr_ratio = (seg_fpr / overall_fpr) if overall_fpr > 0 else None
+
+            auprc_flagged = auprc_ratio is not None and auprc_ratio < auprc_ratio_limit
+            fpr_flagged = fpr_ratio is not None and fpr_ratio > fpr_multiplier_limit
+            directional_bias_flagged = (
+                overall_mean_prob > 0
+                and seg_mean_prob > _DIRECTIONAL_BIAS_MULTIPLIER * overall_mean_prob
+            )
+
+            flagged = auprc_flagged or fpr_flagged or directional_bias_flagged
             if flagged:
                 flagged_names.append(seg_name)
+            if directional_bias_flagged:
+                any_directional_bias = True
 
-            bias_segments.append(
-                {
-                    "segment": seg_name,
-                    "description": description,
-                    "n_samples": n_samples,
-                    "n_fraud": n_fraud,
-                    "auprc": round(seg_auprc, 4),
-                    "fpr": round(seg_fpr, 6),
-                    "flagged": flagged,
-                    "fpr_flagged": fpr_flagged,
-                }
+            log.debug(
+                "Segment %s: auprc=%.4f fpr=%.6f auprc_ratio=%s fpr_ratio=%s "
+                "directional_bias=%s flagged=%s",
+                seg_name,
+                seg_auprc,
+                seg_fpr,
+                f"{auprc_ratio:.4f}" if auprc_ratio is not None else "N/A",
+                f"{fpr_ratio:.4f}" if fpr_ratio is not None else "N/A",
+                directional_bias_flagged,
+                flagged,
             )
+
+            bias_segments.append({
+                "segment": seg_name,
+                "description": description,
+                "n_samples": n_samples,
+                "n_fraud": n_fraud,
+                "auprc": round(seg_auprc, 4),
+                "fpr": round(seg_fpr, 6),
+                "auprc_ratio": round(auprc_ratio, 4) if auprc_ratio is not None else None,
+                "fpr_ratio": round(fpr_ratio, 4) if fpr_ratio is not None else None,
+                "auprc_flagged": auprc_flagged,
+                "fpr_flagged": fpr_flagged,
+                "directional_bias_flagged": directional_bias_flagged,
+                "flagged": flagged,
+            })
+
+        n_segments_flagged = len(flagged_names)
+        any_flagged = n_segments_flagged > 0
 
         if flagged_names:
             recommendation = (
@@ -188,8 +305,12 @@ class BiasTestSuite:
             "overall_auprc": round(overall_auprc, 4),
             "overall_recall": round(overall_recall, 4),
             "overall_fpr": round(overall_fpr, 6),
-            "fpr_parity_threshold": round(fpr_threshold, 6),
             "bias_segments": bias_segments,
+            "summary": {
+                "n_segments_flagged": n_segments_flagged,
+                "directional_bias_detected": any_directional_bias,
+                "any_flagged": any_flagged,
+            },
             "computed_at": datetime.now(timezone.utc).isoformat(),
             "recommendation": recommendation,
         }
@@ -207,8 +328,12 @@ class BiasTestSuite:
             "overall_auprc": 0.0,
             "overall_recall": 0.0,
             "overall_fpr": 0.0,
-            "fpr_parity_threshold": 0.0,
             "bias_segments": [],
+            "summary": {
+                "n_segments_flagged": 0,
+                "directional_bias_detected": False,
+                "any_flagged": False,
+            },
             "computed_at": datetime.now(timezone.utc).isoformat(),
             "recommendation": (
                 "No bias report available — call BiasTestSuite.run() with validation data."
