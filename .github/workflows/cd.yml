@@ -1,0 +1,88 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ── Unit tests ─────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run unit tests
+        run: PYTHONPATH=. pytest tests/unit/ -v
+
+  # ── Staging deploy (no compliance gate) ───────────────────────────────────
+  deploy-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Deploy to staging
+        env:
+          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          MODEL_S3_BUCKET: ${{ vars.MODEL_S3_BUCKET }}
+        run: |
+          echo "Deploying to staging Lambda — no compliance gate at this stage"
+
+  # ── Bias test + compliance gate (production pre-flight) ───────────────────
+  compliance-check:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Bias test
+        run: PYTHONPATH=. python scripts/run_bias_test.py
+
+      - name: Compliance manifest check
+        run: |
+          PYTHONPATH=. python -m src.monitoring.compliance
+          if [ $? -ne 0 ]; then
+            echo "Mandatory EU AI Act articles absent — deployment blocked"
+            exit 1
+          fi
+
+      - name: Upload compliance manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-manifest
+          path: data/reports/compliance_manifest.json
+
+  # ── Production deploy (runs only after compliance gate passes) ────────────
+  deploy-production:
+    needs: compliance-check
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Deploy to production
+        env:
+          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+          MODEL_S3_BUCKET: ${{ vars.MODEL_S3_BUCKET }}
+        run: |
+          echo "Deploying to production Lambda — all gates passed"

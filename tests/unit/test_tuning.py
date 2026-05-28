@@ -89,13 +89,16 @@ def test_bundle_contains_hyperparameters(tmp_path):
 
     model_out = tmp_path / "model.pkl"
     shap_out = tmp_path / "shap.pkl"
-    baseline_out = tmp_path / "baseline.json"
 
     with patch.object(train_mod, "MODEL_OUT", model_out), \
          patch.object(train_mod, "SHAP_OUT", shap_out), \
-         patch.object(train_mod, "BASELINE_OUT", baseline_out), \
          patch.object(train_mod, "MODEL_DIR", tmp_path), \
          patch.object(train_mod, "BASELINE_DIR", tmp_path), \
+         patch.object(train_mod, "REPORTS_DIR", tmp_path / "reports"), \
+         patch.object(train_mod, "MODEL_CARD_PATH", tmp_path / "model_card.json"), \
+         patch.object(train_mod, "_compute_dataset_hash", return_value="fakehash"), \
+         patch.object(train_mod, "_upload_model_card_to_s3"), \
+         patch.object(train_mod, "_upload_onnx_to_s3"), \
          patch("pandas.read_csv", return_value=fake_df), \
          patch.object(XGBClassifier, "fit"), \
          patch.object(XGBClassifier, "predict_proba", return_value=mock_proba):

@@ -28,6 +28,7 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 
 from src.features.engineering import engineer_features
+from src.monitoring.compliance import generate_compliance_manifest
 
 # Suppress Optuna's per-trial verbosity; we log trial results ourselves.
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -188,6 +189,20 @@ def _upload_model_card_to_s3(local_path: Path, bucket: str, version: str) -> Non
         log.info("Model card uploaded → s3://%s/%s", bucket, key)
     except Exception as exc:
         log.warning("S3 upload of model card failed (non-fatal): %s", exc)
+
+
+def _upload_compliance_manifest_to_s3(local_path: Path, bucket: str, version: str) -> None:
+    """Upload compliance_manifest.json to S3; logs warning on failure, never raises."""
+    key = f"compliance/compliance_manifest_{version}.json"
+    try:
+        import boto3
+
+        region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+        s3 = boto3.client("s3", region_name=region)
+        s3.upload_file(str(local_path), bucket, key)
+        log.info("Compliance manifest uploaded → s3://%s/%s", bucket, key)
+    except Exception as exc:
+        log.warning("S3 upload of compliance manifest failed (non-fatal): %s", exc)
 
 
 def _compute_git_sha() -> str:
@@ -709,6 +724,19 @@ def main(args=None) -> None:
         raise  # equivalence mismatch → abort; do not ship a bad ONNX model
     except Exception as exc:
         log.error("ONNX export failed — model.onnx not written: %s", exc)
+
+    # ── 16. Compliance manifest ────────────────────────────────────────────
+    log.info("Generating compliance manifest")
+    compliance_manifest = generate_compliance_manifest(bundle)
+    compliance_path = REPORTS_DIR / "compliance_manifest.json"
+    with open(compliance_path, "w") as f:
+        json.dump(compliance_manifest, f, indent=2)
+    log.info(
+        "Compliance manifest saved → %s  overall_status=%s",
+        compliance_path,
+        compliance_manifest["overall_status"],
+    )
+    _upload_compliance_manifest_to_s3(compliance_path, s3_bucket, MODEL_VERSION)
 
 
 if __name__ == "__main__":

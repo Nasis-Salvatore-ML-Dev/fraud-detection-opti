@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Model artifacts (large binaries — not committed)
+models/*.pkl
+models/*.onnx
+/tmp/
+
+# Data — raw dataset not committed; reports and baselines ARE committed
+data/validation/
+data/creditcard.csv
+
+# Compliance manifest is an audit artifact — always track it
+!data/reports/compliance_manifest.json

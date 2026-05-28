@@ -301,6 +301,7 @@ The following 42 solutions and 8 trimming decisions define the complete upgrade 
 | 26  | CI/CD pipeline exposes (harmful) credentials via static keys        | Replace static IAM keys with OIDC (`aws-actions/configure-aws-credentials`, `role-to-assume`); token expires at job end                                        |
 | 27  | Audit logger violates (harmful) Art. 12 reconstructability          | Identical to #7: add V1–V28 msgpack-compressed to every audit record                                                                                           |
 | 28  | Feature engineering introduces (harmful) train-serve skew           | Compute mean/std from training data; store in model bundle; `preprocessing.py` reads from loaded bundle                                                        |
+|  |
 | 29  | Decision threshold misses (harmful) adaptive fraud patterns         | Dynamic threshold from DynamoDB config (#4); time-aware pattern: threshold tightens during high-risk hours (01:00–05:00)                                       |
 | 30  | HPO tuner optimises (insufficient) hyperparameters (never run)      | Embed Optuna in `train.py` behind `--tune` flag; 100 trials, AUPRC objective, chronological val split                                                          |
 | 31  | Training pipeline exports (insufficient) ONNX (disconnected)        | ONNX export as final step of `train.py`; upload to S3; Model Loader defaults to ONNX                                                                           |

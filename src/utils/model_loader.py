@@ -51,6 +51,7 @@ class ModelBundle:
     version: str
     amount_stats: dict = field(default_factory=dict)
     psi_baseline: dict = field(default_factory=dict)
+    experiment_manifest: dict = field(default_factory=dict)
     calibrator: Any = field(default=None)
     # Set after construction by load_model_bundle(); excluded from __init__
     _onnx_session: Any = field(default=None, init=False, repr=False)
@@ -245,6 +246,7 @@ def load_model_bundle() -> ModelBundle:
         version=bundle["version"],
         amount_stats=bundle.get("amount_stats", {}),
         psi_baseline=bundle.get("psi_baseline", {}),
+        experiment_manifest=bundle.get("experiment_manifest", {}),
         calibrator=bundle.get("calibrator"),
     )
 
