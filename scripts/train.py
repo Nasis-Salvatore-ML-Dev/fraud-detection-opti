@@ -651,6 +651,7 @@ def main(args=None) -> None:
             "recall": float(recall),
             "fpr": float(fpr),
             "threshold": float(optimal_threshold),
+            "fraud_flag_rate": float(y_train.mean()),
         },
         "s3_paths": {
             "model_pkl": _PKL_S3_KEY,
