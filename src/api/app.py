@@ -1,9 +1,11 @@
 """Fraud detection API — FastAPI application deployed on AWS Lambda via Mangum."""
 
 import hashlib
+import json
 import logging
 import os
 import sys
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -29,6 +31,7 @@ from src.api.schemas import (
 from src.monitoring.audit_logger import AuditLogger
 from src.monitoring.bias_tester import BiasTestSuite
 from src.monitoring.drift import DriftMonitor
+from src.monitoring.metrics import publish_component_failure
 from src.utils import model_loader as _model_loader
 from src.utils.model_loader import ModelBundle, load_model_bundle
 
@@ -57,10 +60,16 @@ _audit: AuditLogger | None = None
 _drift: DriftMonitor | None = None
 _bias: BiasTestSuite | None = None
 
+_FALLBACK_MODE: bool = False
+
 # SHAP is disabled: the Lambda deployment image uses a stripped Python runtime
 # whose C-extension ABI is incompatible with the shap wheel built locally.
 # Re-enable by building shap inside the container image and setting SHAP_ENABLED=1.
 _SHAP_ENABLED = False
+
+# Fallback scoring constants — match training-set normalisation in bias_tester.py
+_FALLBACK_AMOUNT_MEAN: float = 90.8249
+_FALLBACK_AMOUNT_STD: float = 250.5032
 
 
 def _effective_threshold(active_threshold: float, hour_of_day: float) -> float:
@@ -70,33 +79,75 @@ def _effective_threshold(active_threshold: float, hour_of_day: float) -> float:
     return active_threshold
 
 
+def _publish_sns_alert(prediction_id: str, fraud_probability: float, amount: float) -> None:
+    """Publish a high-value fraud alert to SNS in a daemon thread. Never raises."""
+    sns_arn = os.environ.get("HIGH_VALUE_SNS_ARN")
+    if not sns_arn:
+        log.warning(
+            "HIGH_VALUE_SNS_ARN not set — skipping high-value alert for prediction_id=%s",
+            prediction_id,
+        )
+        return
+
+    def _do_publish() -> None:
+        try:
+            sns = boto3.client(
+                "sns",
+                region_name=os.environ.get("AWS_DEFAULT_REGION", "eu-central-1"),
+            )
+            sns.publish(
+                TopicArn=sns_arn,
+                Message=json.dumps({
+                    "prediction_id": prediction_id,
+                    "fraud_probability": fraud_probability,
+                    "amount": amount,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }),
+            )
+            log.debug("SNS high-value alert published for prediction_id=%s", prediction_id)
+        except Exception as exc:
+            log.warning(
+                "SNS high-value alert failed for prediction_id=%s: %s", prediction_id, exc
+            )
+
+    threading.Thread(target=_do_publish, daemon=True).start()
+
+
 # ---------------------------------------------------------------------------
 # Lifespan
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _bundle, _audit, _drift, _bias
+    global _bundle, _audit, _drift, _bias, _FALLBACK_MODE
 
     log.info("Container cold-start — initialising services")
 
-    # Model bundle (fatal: no point serving without a model)
-    try:
-        _bundle = load_model_bundle()
-        set_amount_stats(_bundle.amount_stats)
-        register_validation_stats({
-            "psi_baseline": _bundle.psi_baseline,
-            "amount_stats": _bundle.amount_stats,
-        })
-        log.info("Validation stats registered (%d PSI features)", len(_bundle.psi_baseline))
-    except Exception as exc:
-        log.error("FATAL: model bundle failed to load: %s", exc)
-        raise
+    # Model bundle — 3 attempts with 2 s backoff; fall back to rule-based scoring on all failures
+    for attempt in range(1, 4):
+        try:
+            _bundle = load_model_bundle()
+            set_amount_stats(_bundle.amount_stats)
+            register_validation_stats({
+                "psi_baseline": _bundle.psi_baseline,
+                "amount_stats": _bundle.amount_stats,
+            })
+            log.info("Validation stats registered (%d PSI features)", len(_bundle.psi_baseline))
+            break
+        except Exception as exc:
+            log.warning("Model bundle load attempt %d/3 failed: %s", attempt, exc)
+            publish_component_failure("InferenceAPI")
+            if attempt < 3:
+                time.sleep(2)
+    else:
+        log.error("Model bundle failed to load after 3 attempts — entering fallback mode")
+        _FALLBACK_MODE = True
 
     # Audit logger (fatal: predictions must be auditable)
     try:
         _audit = AuditLogger()
     except Exception as exc:
         log.error("FATAL: AuditLogger failed to initialise: %s", exc)
+        publish_component_failure("InferenceAPI")
         raise
 
     # Drift monitor (fatal: drift detection is required for production)
@@ -104,6 +155,7 @@ async def lifespan(app: FastAPI):
         _drift = DriftMonitor()
     except Exception as exc:
         log.error("FATAL: DriftMonitor failed to initialise: %s", exc)
+        publish_component_failure("InferenceAPI")
         raise
 
     # Bias test suite (non-fatal: degrades gracefully — /metrics returns 503)
@@ -111,6 +163,7 @@ async def lifespan(app: FastAPI):
         _bias = BiasTestSuite()
     except Exception as exc:
         log.warning("BiasTestSuite failed to initialise (non-fatal): %s", exc)
+        publish_component_failure("InferenceAPI")
 
     log.info("All services ready — application startup complete")
     yield
@@ -153,10 +206,46 @@ def health() -> HealthResponse:
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(payload: PredictionRequest, req: Request) -> PredictionResponse:
     """Score a single transaction and return a fraud probability."""
+    t0 = time.perf_counter()
+    prediction_id = str(uuid.uuid4())
+
+    # Rule-based fallback path — activated when model bundle failed to load
+    if _FALLBACK_MODE:
+        hour_of_day = int(payload.time % 86400) // 3600
+        amount_zscore = (payload.amount - _FALLBACK_AMOUNT_MEAN) / _FALLBACK_AMOUNT_STD
+        is_fraud = (amount_zscore > 3) or (hour_of_day in {1, 2, 3, 4, 5})
+        fraud_probability = 0.75 if is_fraud else 0.05
+        confidence_score = fraud_probability
+        processing_time_ms = (time.perf_counter() - t0) * 1000
+
+        log.warning(
+            "prediction_id=%s served in fallback mode (no model bundle)",
+            prediction_id,
+        )
+
+        high_value_alert = payload.amount > 1000 and fraud_probability > 0.3
+        if high_value_alert:
+            _publish_sns_alert(prediction_id, fraud_probability, payload.amount)
+
+        return PredictionResponse(
+            prediction_id=prediction_id,
+            is_fraud=is_fraud,
+            fraud_probability=fraud_probability,
+            confidence_score=confidence_score,
+            shap_values={},
+            model_version="fallback",
+            processing_time_ms=processing_time_ms,
+            flagged_for_review=0.3 <= fraud_probability <= 0.7,
+            threshold_used=0.5,
+            effective_threshold=0.5,
+            anomaly_flags=payload.anomaly_flags,
+            high_amount_flag=payload.high_amount_flag,
+            fallback_mode=True,
+            high_value_alert=high_value_alert,
+        )
+
     if _bundle is None or _audit is None:
         raise HTTPException(status_code=503, detail="Service not ready")
-
-    t0 = time.perf_counter()
 
     features = build_feature_dataframe(payload, _bundle.feature_names)
     proba = _bundle.model.predict_proba(features)
@@ -179,7 +268,6 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
     is_fraud = fraud_probability >= effective_thr
     flagged_for_review = 0.3 <= fraud_probability <= 0.7
 
-    prediction_id = str(uuid.uuid4())
     log.debug(
         "prediction_id=%s effective_threshold=%.4f hour_of_day=%.0f",
         prediction_id, effective_thr, hour_of_day,
@@ -234,6 +322,10 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
             payload.amount,
         )
 
+    high_value_alert = payload.amount > 1000 and fraud_probability > 0.3
+    if high_value_alert:
+        _publish_sns_alert(prediction_id, fraud_probability, payload.amount)
+
     return PredictionResponse(
         prediction_id=prediction_id,
         is_fraud=is_fraud,
@@ -247,6 +339,8 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         effective_threshold=effective_thr,
         anomaly_flags=payload.anomaly_flags,
         high_amount_flag=payload.high_amount_flag,
+        fallback_mode=False,
+        high_value_alert=high_value_alert,
     )
 
 

@@ -13,3 +13,5 @@
 | `MODEL_S3_BUCKET` | `fraud-model-artifacts-209998132741` | S3 bucket from which the model bundle and ONNX model are downloaded on cold-start. |
 | `MODEL_S3_KEY` | `models/xgboost_fraud_v1.pkl` | S3 key for the pkl bundle. |
 | `BASELINE_PATH` | *(auto-resolved)* | Path to `training_baseline.json`; auto-set after S3 download. |
+| `HIGH_VALUE_SNS_ARN` | *(optional)* | SNS topic ARN for high-value fraud alerts (`Amount > 1000` and `fraud_probability > 0.3`). If unset, alerts are skipped with a warning log. |
+| `AWS_REGION` | `eu-central-1` | AWS region used by CloudWatch for `ComponentFailure` metric publishing (distinct from `AWS_DEFAULT_REGION` used by DynamoDB/SNS). |

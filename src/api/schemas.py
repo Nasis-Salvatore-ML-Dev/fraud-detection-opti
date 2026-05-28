@@ -175,6 +175,8 @@ class PredictionResponse(BaseModel):
     effective_threshold: float = 0.0
     anomaly_flags: list[str] = Field(default_factory=list)
     high_amount_flag: bool = False
+    fallback_mode: bool = False
+    high_value_alert: bool = False
 
 
 class ConfigUpdateRequest(BaseModel):

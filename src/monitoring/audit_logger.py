@@ -11,6 +11,7 @@ import boto3
 import msgpack
 
 from src.explainability.shap_explainer import get_shap_values
+from src.monitoring.metrics import publish_component_failure
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +93,7 @@ class AuditLogger:
                 log.debug("SHAP not found for prediction_hash=%s", prediction_hash)
         except Exception as exc:
             log.warning("SHAP lookup failed for prediction_hash=%s: %s", prediction_hash, exc)
+            publish_component_failure("AuditLogger")
 
         item: dict = {
             "prediction_id": prediction_id,
@@ -125,6 +127,7 @@ class AuditLogger:
             await loop.run_in_executor(None, lambda: self._audit_table.put_item(Item=item))
         except Exception as exc:
             log.error("AuditLogger.write failed (silent): %s", exc)
+            publish_component_failure("AuditLogger")
 
     async def fetch(self, prediction_id: str) -> dict | None:
         """GetItem by prediction_id. Returns None if not found or on error."""
@@ -153,6 +156,7 @@ class AuditLogger:
             return record
         except Exception as exc:
             log.error("AuditLogger.fetch failed (silent): %s", exc)
+            publish_component_failure("AuditLogger")
             return None
 
     async def fetch_recent(self, limit: int = 500) -> list[dict]:
@@ -181,6 +185,7 @@ class AuditLogger:
             return records
         except Exception as exc:
             log.error("AuditLogger.fetch_recent failed (silent): %s", exc)
+            publish_component_failure("AuditLogger")
             return []
 
     async def fetch_pending_reviews(self) -> list[dict]:
@@ -212,4 +217,5 @@ class AuditLogger:
             return records
         except Exception as exc:
             log.error("AuditLogger.fetch_pending_reviews failed: %s", exc)
+            publish_component_failure("AuditLogger")
             return []

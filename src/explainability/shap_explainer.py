@@ -10,6 +10,8 @@ import os
 import boto3
 import msgpack
 
+from src.monitoring.metrics import publish_component_failure
+
 log = logging.getLogger(__name__)
 
 _SHAP_TABLE = os.environ.get("SHAP_TABLE", "fraud-shap-store")
@@ -39,4 +41,5 @@ def get_shap_values(prediction_hash: str, table_name: str = "") -> dict | None:
 
     except Exception as exc:
         log.warning("get_shap_values failed (non-fatal): %s", exc)
+        publish_component_failure("ShapExplainer")
         return None
