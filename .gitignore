@@ -38,3 +38,7 @@ data/creditcard.csv
 
 # Compliance manifest is an audit artifact — always track it
 !data/reports/compliance_manifest.json
+data/baselines/shap_background.pkl
+data/baselines/training_baseline.json
+data/training/
+models/
