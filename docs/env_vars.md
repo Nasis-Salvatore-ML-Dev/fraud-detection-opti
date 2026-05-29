@@ -16,6 +16,7 @@
 | `HIGH_VALUE_SNS_ARN` | *(optional)* | SNS topic ARN for high-value fraud alerts (`Amount > 1000` and `fraud_probability > 0.3`). If unset, alerts are skipped with a warning log. |
 | `AWS_REGION` | `eu-central-1` | AWS region used by CloudWatch for `ComponentFailure` metric publishing (distinct from `AWS_DEFAULT_REGION` used by DynamoDB/SNS). |
 | `BIAS_SEGMENTS_PATH` | *(auto-resolved)* | Path to a JSON file defining bias evaluation segments. Defaults to `data/baselines/bias_segments.json`. Each entry must include `name`, `feature`, `threshold`, `comparison` (gt/gte/lt/lte), `fpr_multiplier_limit`, and `auprc_ratio_limit`. |
+| `VELOCITY_TABLE` | `fraud-velocity-store` | DynamoDB table for per-card velocity features (transaction counts, amount sums, time-since-last-tx). Items expire after 7 days via TTL on `expires_at`. Optional — if DynamoDB is unavailable, zero defaults are used and prediction continues. |
 
 ## Retraining orchestrator
 

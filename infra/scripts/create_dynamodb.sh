@@ -133,5 +133,33 @@ fi
 
 echo "[OK]      $TABLE_CONFIG  (seed: threshold=0.5)"
 
+# ---------------------------------------------------------------------------
+# 4. fraud-velocity-store
+#    PK: card_hash (S)
+#    Billing: PAY_PER_REQUEST   TTL: expires_at (7-day expiry per card)
+# ---------------------------------------------------------------------------
+TABLE_VELOCITY="fraud-velocity-store"
+
+aws dynamodb create-table \
+    --table-name "$TABLE_VELOCITY" \
+    --region "$REGION" \
+    --billing-mode PAY_PER_REQUEST \
+    --attribute-definitions \
+        AttributeName=card_hash,AttributeType=S \
+    --key-schema \
+        AttributeName=card_hash,KeyType=HASH \
+    --output text \
+    --query "TableDescription.TableName" \
+    > /dev/null 2>&1 || true
+
+aws dynamodb update-time-to-live \
+    --table-name "$TABLE_VELOCITY" \
+    --region "$REGION" \
+    --time-to-live-specification \
+        Enabled=true,AttributeName=expires_at \
+    > /dev/null 2>&1 || true
+
+echo "[OK]      $TABLE_VELOCITY  (TTL: expires_at)"
+
 echo ""
 echo "DynamoDB setup complete."

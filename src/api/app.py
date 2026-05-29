@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 from src.api.middleware import LoggingMiddleware
-from src.api.preprocessing import build_feature_dataframe, set_amount_stats
+from src.api.preprocessing import build_feature_dataframe, set_amount_stats, velocity_store
 from src.api.schemas import (
     BiasReportResponse,
     ConfigUpdateRequest,
@@ -300,6 +300,19 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         latency_ms=processing_time_ms,
         threshold_used=effective_thr,
     )
+
+    # Update velocity store asynchronously — daemon thread so it never blocks Lambda shutdown.
+    try:
+        v_arr = np.array(
+            [float(getattr(payload, f"v{i}")) for i in range(1, 29)], dtype=np.float64
+        )
+        threading.Thread(
+            target=velocity_store.update_card_features,
+            args=(v_arr, float(payload.amount), time.time()),
+            daemon=True,
+        ).start()
+    except Exception as exc:
+        log.warning("Failed to launch velocity update thread: %s", exc)
 
     if flagged_for_review:
         log.info(

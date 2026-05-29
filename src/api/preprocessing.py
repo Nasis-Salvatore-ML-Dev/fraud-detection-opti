@@ -8,14 +8,19 @@ build_feature_dataframe().
 
 import logging
 
+import numpy as np
 import pandas as pd
 
 from src.api.schemas import PredictionRequest
 from src.features.engineering import engineer_features
+from src.features.velocity import VelocityStore
 
 log = logging.getLogger(__name__)
 
 _amount_stats: dict | None = None
+
+# Single VelocityStore instance shared for the lifetime of the process.
+velocity_store = VelocityStore()
 
 
 def set_amount_stats(stats: dict) -> None:
@@ -42,6 +47,12 @@ def build_feature_dataframe(
             "Amount stats are not configured. Call set_amount_stats() with the "
             "model bundle's 'amount_stats' dict before serving predictions."
         )
+
+    # Extract V1-V28 before engineering — used as the card identity for velocity lookup.
+    v_feature_vector = np.array(
+        [float(getattr(request, f"v{i}")) for i in range(1, 29)],
+        dtype=np.float64,
+    )
 
     raw: dict[str, float] = {
         "V1": request.v1,
@@ -78,6 +89,17 @@ def build_feature_dataframe(
 
     df = pd.DataFrame([raw])
     df = engineer_features(df, _amount_stats)
+
+    # Append velocity features (5 columns) after the engineered base features.
+    vel = velocity_store.get_card_features(v_feature_vector)
+    all_defaults = all(v == 0 or v == 0.0 for v in vel.values())
+    if all_defaults:
+        log.debug(
+            "Velocity features returned defaults for card_hash=%.8s...",
+            __import__("hashlib").sha256(v_feature_vector.tobytes()).hexdigest(),
+        )
+    for key, value in vel.items():
+        df[key] = value
 
     # Select and reorder to match the exact sequence the model expects
     try:

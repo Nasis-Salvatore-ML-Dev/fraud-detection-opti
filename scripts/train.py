@@ -73,6 +73,15 @@ _EQUIVALENCE_TOL = 1e-4
 MODEL_VERSION = "xgboost_fraud_v1"
 DEFAULT_THRESHOLD = 0.5
 
+# Velocity features appended to every row during training (zeros: store unavailable at train time)
+_VELOCITY_FEATURE_COLS = [
+    "tx_count_1h",
+    "tx_count_24h",
+    "tx_count_7d",
+    "time_since_last_tx_seconds",
+    "amount_sum_1h",
+]
+
 PSI_N_BINS = 10
 
 _REQUIRED_BUNDLE_KEYS = {
@@ -505,12 +514,27 @@ def main(args=None) -> None:
     log.debug("Amount stats (train): mean=%.4f std=%.4f", amount_stats["mean"], amount_stats["std"])
     df = engineer_features(df, amount_stats)
 
+    # Velocity features are always zero at training time (store is unavailable during training).
+    for col in _VELOCITY_FEATURE_COLS:
+        df[col] = 0.0
+
     feature_cols = [c for c in df.columns if c.startswith("V")] + [
         "Amount",
         "amount_log",
         "amount_zscore",
         "hour_of_day",
-    ]
+    ] + _VELOCITY_FEATURE_COLS
+
+    _n_v = len([c for c in df.columns if c.startswith("V")])
+    assert len(feature_cols) == _n_v + 4 + len(_VELOCITY_FEATURE_COLS), (
+        f"Feature count mismatch: expected {_n_v + 4 + len(_VELOCITY_FEATURE_COLS)}, "
+        f"got {len(feature_cols)}"
+    )
+    log.info(
+        "Feature set: %d V-features + 4 engineered + %d velocity = %d total",
+        _n_v, len(_VELOCITY_FEATURE_COLS), len(feature_cols),
+    )
+
     X = df[feature_cols]
     y = df["Class"].astype(int)
 
@@ -647,6 +671,17 @@ def main(args=None) -> None:
     log.info("Computing PSI baseline for %d features + fraud_probability", len(feature_cols))
     y_prob_train = model.predict_proba(X_train)[:, 1]
     psi_baseline = _compute_psi_baseline(X_train, y_prob_train)
+
+    # Velocity features are all-zero during training so _compute_psi_baseline skips them
+    # (no variance). Add a two-bin placeholder baseline so the bundle passes validation and
+    # drift monitoring can detect when serving-time values diverge from the training zeros.
+    for col in _VELOCITY_FEATURE_COLS:
+        if col not in psi_baseline:
+            psi_baseline[col] = {
+                "bin_edges": [-1.0, 0.5, 1_000_000.0],
+                "expected_proportions": [1.0 - 1e-9, 1e-9],
+            }
+            log.debug("Added placeholder PSI baseline for zero-variance feature %r", col)
 
     # ── 10. Isotonic calibrator (fitted on test / validation set) ─────────
     log.info("Fitting isotonic calibrator on validation set")
