@@ -18,6 +18,13 @@
 | `BIAS_SEGMENTS_PATH` | *(auto-resolved)* | Path to a JSON file defining bias evaluation segments. Defaults to `data/baselines/bias_segments.json`. Each entry must include `name`, `feature`, `threshold`, `comparison` (gt/gte/lt/lte), `fpr_multiplier_limit`, and `auprc_ratio_limit`. |
 | `VELOCITY_TABLE` | `fraud-velocity-store` | DynamoDB table for per-card velocity features (transaction counts, amount sums, time-since-last-tx). Items expire after 7 days via TTL on `expires_at`. Optional — if DynamoDB is unavailable, zero defaults are used and prediction continues. |
 
+## CI/CD pipeline
+
+| Variable | Default | Description |
+|---|---|---|
+| `AWS_ROLE_ARN` | *(required)* | IAM role ARN assumed via OIDC in CI jobs that deploy to AWS (deploy-staging, shadow-eval, deploy-production). Replaces static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. |
+| `STAGING_ENDPOINT` | *(required)* | Base URL of the staging Lambda (e.g. `https://abc123.execute-api.eu-central-1.amazonaws.com/staging`). Used by smoke-test (health check + latency gate) and shadow-eval. |
+
 ## Retraining orchestrator
 
 The `src/monitoring/retraining_trigger.py` module is designed to run as a scheduled AWS Lambda triggered by CloudWatch Events (EventBridge) on a daily schedule. It reads 4 CloudWatch drift signals and dispatches the `train.yml` GitHub Actions workflow when 2 or more signals fire.

@@ -5,10 +5,16 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ── Unit tests ─────────────────────────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,11 +25,14 @@ jobs:
       - name: Run unit tests
         run: PYTHONPATH=. pytest tests/unit/ -v
 
-  # ── Staging deploy (no compliance gate) ───────────────────────────────────
+  # ── Staging deploy ─────────────────────────────────────────────────────────
   deploy-staging:
     needs: test
     runs-on: ubuntu-latest
     environment: staging
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,16 +40,98 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
       - name: Deploy to staging
         env:
-          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
           MODEL_S3_BUCKET: ${{ vars.MODEL_S3_BUCKET }}
         run: |
-          echo "Deploying to staging Lambda — no compliance gate at this stage"
+          zip -r function.zip src/ -x "*.pyc" -x "*/__pycache__/*"
+          aws s3 cp function.zip \
+            "s3://$MODEL_S3_BUCKET/deployments/fraud-detection-api-${{ github.sha }}.zip"
+          aws lambda update-function-code \
+            --function-name fraud-detection-api-staging \
+            --s3-bucket "$MODEL_S3_BUCKET" \
+            --s3-key "deployments/fraud-detection-api-${{ github.sha }}.zip"
+          aws lambda wait function-updated \
+            --function-name fraud-detection-api-staging
 
-  # ── Bias test + compliance gate (production pre-flight) ───────────────────
-  compliance-check:
+  # ── Smoke test ─────────────────────────────────────────────────────────────
+  smoke-test:
     needs: deploy-staging
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Health check
+        run: curl -sf "${{ vars.STAGING_ENDPOINT }}/health"
+      - name: Predict smoke test
+        run: |
+          PAYLOAD='{"time":1000.0,"amount":149.62'
+          PAYLOAD="$PAYLOAD"',"v1":-1.3598,"v2":-0.0728,"v3":2.5363,"v4":1.3782'
+          PAYLOAD="$PAYLOAD"',"v5":-0.3383,"v6":0.4624,"v7":0.2396,"v8":0.0987'
+          PAYLOAD="$PAYLOAD"',"v9":0.3638,"v10":0.0908,"v11":-0.5516,"v12":-0.6178'
+          PAYLOAD="$PAYLOAD"',"v13":-0.9914,"v14":-0.3112,"v15":1.4682,"v16":-0.4704'
+          PAYLOAD="$PAYLOAD"',"v17":0.2076,"v18":0.0258,"v19":0.4036,"v20":0.2514'
+          PAYLOAD="$PAYLOAD"',"v21":-0.0183,"v22":0.2779,"v23":-0.1105,"v24":0.0669'
+          PAYLOAD="$PAYLOAD"',"v25":0.1285,"v26":-0.1891,"v27":0.1336,"v28":-0.0210}'
+          curl -sf -X POST "${{ vars.STAGING_ENDPOINT }}/predict" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+      - name: p99 latency check
+        run: |
+          PYTHONPATH=. python scripts/latency_check.py \
+            --endpoint "${{ vars.STAGING_ENDPOINT }}" \
+            --requests 20 \
+            --p99-limit 200
+
+  # ── Shadow evaluation ──────────────────────────────────────────────────────
+  shadow-eval:
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - name: Run shadow evaluation
+        env:
+          STAGING_ENDPOINT: ${{ vars.STAGING_ENDPOINT }}
+        run: |
+          mkdir -p data/reports
+          PYTHONPATH=. python scripts/shadow_eval.py \
+            --endpoint "$STAGING_ENDPOINT" \
+            --limit 1000 \
+            --output data/reports/shadow_eval.json
+      - name: Upload shadow eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-eval-report
+          path: data/reports/shadow_eval.json
+
+  # ── Bias test + compliance gate ────────────────────────────────────────────
+  compliance-check:
+    needs: shadow-eval
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +140,8 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
-
       - name: Bias test
         run: PYTHONPATH=. python scripts/run_bias_test.py
-
       - name: Compliance manifest check
         run: |
           PYTHONPATH=. python -m src.monitoring.compliance
@@ -60,19 +149,39 @@ jobs:
             echo "Mandatory EU AI Act articles absent — deployment blocked"
             exit 1
           fi
-
+      - name: Post compliance summary
+        if: always()
+        run: |
+          echo "## Compliance Gate Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f data/reports/compliance_manifest.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/reports/compliance_manifest.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No compliance manifest generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload compliance manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: compliance-manifest
           path: data/reports/compliance_manifest.json
+      - name: Upload combined CD artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-artifacts
+          path: data/reports/
 
-  # ── Production deploy (runs only after compliance gate passes) ────────────
+  # ── Production deploy (canary) ─────────────────────────────────────────────
   deploy-production:
     needs: compliance-check
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -80,9 +189,89 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
-      - name: Deploy to production
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+      - name: A - Publish new Lambda version
         env:
-          AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
           MODEL_S3_BUCKET: ${{ vars.MODEL_S3_BUCKET }}
         run: |
-          echo "Deploying to production Lambda — all gates passed"
+          aws lambda update-function-code \
+            --function-name fraud-detection-api \
+            --s3-bucket "$MODEL_S3_BUCKET" \
+            --s3-key "deployments/fraud-detection-api-${{ github.sha }}.zip"
+          aws lambda wait function-updated \
+            --function-name fraud-detection-api
+          NEW_VERSION=$(aws lambda publish-version \
+            --function-name fraud-detection-api \
+            --query Version --output text)
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+      - name: B - Shift 10 % traffic to new version
+        run: |
+          OLD_VERSION=$(aws lambda get-alias \
+            --function-name fraud-detection-api \
+            --name live \
+            --query FunctionVersion --output text)
+          echo "OLD_VERSION=$OLD_VERSION" >> "$GITHUB_ENV"
+          aws lambda update-alias \
+            --function-name fraud-detection-api \
+            --name live \
+            --function-version "$OLD_VERSION" \
+            --routing-config "AdditionalVersionWeights={\"$NEW_VERSION\":0.1}"
+      - name: C - Wait 30 s for canary traffic
+        run: sleep 30
+      - name: D - Check canary error rate
+        id: canary-check
+        run: |
+          END=$(date -u +%s)
+          START=$((END - 60))
+          START_ISO=$(date -u -d "@$START" +%Y-%m-%dT%H:%M:%SZ)
+          END_ISO=$(date -u -d "@$END" +%Y-%m-%dT%H:%M:%SZ)
+          ERRORS=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/Lambda \
+            --metric-name Errors \
+            --dimensions \
+              Name=FunctionName,Value=fraud-detection-api \
+              Name=Resource,Value="fraud-detection-api:live" \
+            --start-time "$START_ISO" --end-time "$END_ISO" \
+            --period 60 --statistics Sum \
+            --query "Datapoints[0].Sum" --output text)
+          INVOCATIONS=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/Lambda \
+            --metric-name Invocations \
+            --dimensions \
+              Name=FunctionName,Value=fraud-detection-api \
+              Name=Resource,Value="fraud-detection-api:live" \
+            --start-time "$START_ISO" --end-time "$END_ISO" \
+            --period 60 --statistics Sum \
+            --query "Datapoints[0].Sum" --output text)
+          if [ "$INVOCATIONS" = "None" ] || [ "$INVOCATIONS" = "0" ] || [ -z "$INVOCATIONS" ]; then
+            echo "canary_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            ERROR_RATE=$(python3 -c "print(float('${ERRORS}' or 0) / float('${INVOCATIONS}'))")
+            if python3 -c "import sys; sys.exit(0 if float('$ERROR_RATE') < 0.01 else 1)"; then
+              echo "canary_ok=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "canary_ok=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+      - name: E - Promote to 100 % (canary passed)
+        if: steps.canary-check.outputs.canary_ok == 'true'
+        run: |
+          aws lambda update-alias \
+            --function-name fraud-detection-api \
+            --name live \
+            --function-version "$NEW_VERSION" \
+            --routing-config "AdditionalVersionWeights={}"
+      - name: F - Rollback on canary failure
+        if: steps.canary-check.outputs.canary_ok == 'false'
+        run: |
+          aws lambda update-alias \
+            --function-name fraud-detection-api \
+            --name live \
+            --function-version "$OLD_VERSION" \
+            --routing-config "AdditionalVersionWeights={}"
+          echo "Canary error rate exceeded 1 % — rolled back to version $OLD_VERSION" >&2
+          exit 1
