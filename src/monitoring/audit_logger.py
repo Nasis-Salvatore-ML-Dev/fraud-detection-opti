@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import boto3
 import msgpack
+import numpy as np
 
 from src.explainability.shap_explainer import get_shap_values
 from src.monitoring.metrics import publish_component_failure
@@ -38,6 +39,17 @@ def _from_dynamo(obj):
     return obj
 
 
+def _floats_to_decimal(obj):
+    """Recursively convert float values to Decimal for DynamoDB storage."""
+    if isinstance(obj, float):
+        return Decimal(str(round(obj, 8)))
+    if isinstance(obj, dict):
+        return {k: _floats_to_decimal(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_floats_to_decimal(v) for v in obj]
+    return obj
+
+
 def extract_v_features(input_dict: dict) -> dict:
     """Pull V1-V28 from input_dict and return them as a plain {Vi: float} dict."""
     return {
@@ -45,6 +57,98 @@ def extract_v_features(input_dict: dict) -> dict:
         for key, val in input_dict.items()
         if key.startswith("V") and key[1:].isdigit()
     }
+
+
+def find_similar_cases(
+    v_features: dict,
+    current_prediction_id: str,
+    table_name: str,
+    n: int = 3,
+) -> list[dict]:
+    """Return top-n cosine-similar resolved audit records to the given V-features.
+
+    Queries the requires-review-index GSI for resolved (non-review) records,
+    computes cosine similarity in-memory using numpy, and returns the top-n
+    sorted by similarity descending.
+
+    Never raises. Returns empty list on any failure or when fewer than 10
+    resolved records exist.
+    """
+    try:
+        from boto3.dynamodb.conditions import Key as _DynamoKey
+
+        region = os.environ.get("AWS_DEFAULT_REGION", "eu-central-1")
+        dynamo = boto3.resource("dynamodb", region_name=region)
+        table = dynamo.Table(table_name)
+
+        response = table.query(
+            IndexName="requires-review-index",
+            KeyConditionExpression=_DynamoKey("requires_review").eq("false"),
+            Limit=500,
+        )
+        raw_items = response.get("Items", [])
+
+        sorted_keys = sorted(
+            k for k in v_features if k.startswith("V") and k[1:].isdigit()
+        )
+        if not sorted_keys:
+            return []
+
+        q_vec = np.array([float(v_features[k]) for k in sorted_keys], dtype=np.float64)
+        q_norm = float(np.linalg.norm(q_vec))
+        if q_norm == 0:
+            return []
+
+        candidates: list[tuple[dict, np.ndarray]] = []
+        for item in raw_items:
+            if item.get("prediction_id") == current_prediction_id:
+                continue
+            raw = item.get("v_features_msgpack")
+            if raw is None:
+                continue
+            try:
+                v_dict = msgpack.unpackb(bytes(raw), raw=False)
+                c_vec = np.array(
+                    [float(v_dict.get(k, 0.0)) for k in sorted_keys], dtype=np.float64
+                )
+                candidates.append((item, c_vec))
+            except Exception:
+                continue
+
+        if len(candidates) < 10:
+            log.debug(
+                "find_similar_cases: not enough history (%d records) — skipping",
+                len(candidates),
+            )
+            return []
+
+        mat = np.stack([c for _, c in candidates])    # (N, 28)
+        norms = np.linalg.norm(mat, axis=1)            # (N,)
+        dot_products = mat.dot(q_vec)                  # (N,)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            similarities = np.where(norms > 0, dot_products / (norms * q_norm), 0.0)
+
+        top_indices = np.argsort(similarities)[::-1][:n]
+
+        results = []
+        for idx in top_indices:
+            item, _ = candidates[int(idx)]
+            record = _from_dynamo(item)
+            results.append({
+                "prediction_id": str(record.get("prediction_id", "")),
+                "fraud_probability": float(record.get("fraud_probability", 0.0)),
+                "is_fraud": bool(record.get("is_fraud", False)),
+                "shap_top3": record.get("shap_top3", []),
+                "amount": float(record.get("Amount", 0.0)),
+                "similarity_score": round(float(similarities[int(idx)]), 4),
+            })
+
+        return results
+
+    except Exception as exc:
+        log.warning("find_similar_cases failed: %s", exc)
+        publish_component_failure("AuditLogger")
+        return []
 
 
 class AuditLogger:
@@ -68,6 +172,8 @@ class AuditLogger:
         request_ip: str,
         latency_ms: float,
         threshold_used: float,
+        anomaly_flags: list = (),
+        high_value_alert: bool = False,
     ) -> None:
         """PutItem to DynamoDB. Logs error on failure but never raises."""
         requires_review = _REVIEW_PROB_LO <= fraud_probability <= _REVIEW_PROB_HI
@@ -95,6 +201,21 @@ class AuditLogger:
             log.warning("SHAP lookup failed for prediction_hash=%s: %s", prediction_hash, exc)
             publish_component_failure("AuditLogger")
 
+        # Similar cases lookup — only for review predictions
+        similar_cases: list = []
+        if requires_review:
+            try:
+                similar_cases = find_similar_cases(v_dict, prediction_id, _AUDIT_TABLE)
+                log.debug(
+                    "Similar cases found: %d for prediction_id=%s",
+                    len(similar_cases), prediction_id,
+                )
+            except Exception as exc:
+                log.warning(
+                    "find_similar_cases failed for prediction_id=%s: %s", prediction_id, exc
+                )
+                similar_cases = []
+
         item: dict = {
             "prediction_id": prediction_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -117,6 +238,10 @@ class AuditLogger:
             "threshold_used": _to_decimal(threshold_used),
             # Review flag (stored as string for GSI compatibility)
             "requires_review": "true" if requires_review else "false",
+            # Decision-support context
+            "similar_cases": _floats_to_decimal(similar_cases),
+            "anomaly_flags": list(anomaly_flags),
+            "high_value_alert": bool(high_value_alert),
         }
 
         if requires_review:
@@ -208,10 +333,14 @@ class AuditLogger:
                     {
                         "prediction_id": record.get("prediction_id"),
                         "fraud_probability": record.get("fraud_probability"),
+                        "confidence_score": float(record.get("confidence_score", 0.0)),
                         "shap_top3": record.get("shap_top3", []),
+                        "similar_cases": record.get("similar_cases", []),
                         "amount": float(record.get("Amount", 0)),
-                        "requires_review": record.get("requires_review"),
+                        "requires_review": record.get("requires_review") == "true",
                         "timestamp": record.get("timestamp"),
+                        "anomaly_flags": record.get("anomaly_flags", []),
+                        "high_value_alert": bool(record.get("high_value_alert", False)),
                     }
                 )
             return records

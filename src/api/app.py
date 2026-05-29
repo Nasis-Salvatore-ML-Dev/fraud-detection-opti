@@ -24,8 +24,10 @@ from src.api.schemas import (
     ConfigUpdateRequest,
     DriftReportResponse,
     HealthResponse,
+    PendingReviewItem,
     PredictionRequest,
     PredictionResponse,
+    WarmupResponse,
     register_validation_stats,
 )
 from src.monitoring.audit_logger import AuditLogger
@@ -287,6 +289,8 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         "hour_of_day": float(features["hour_of_day"].iloc[0]),
     }
 
+    high_value_alert = payload.amount > 1000 and fraud_probability > 0.3
+
     await _audit.write(
         prediction_id=prediction_id,
         prediction_hash=prediction_hash,
@@ -299,6 +303,8 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
         request_ip=request_ip,
         latency_ms=processing_time_ms,
         threshold_used=effective_thr,
+        anomaly_flags=payload.anomaly_flags,
+        high_value_alert=high_value_alert,
     )
 
     # Update velocity store asynchronously — daemon thread so it never blocks Lambda shutdown.
@@ -335,7 +341,6 @@ async def predict(payload: PredictionRequest, req: Request) -> PredictionRespons
             payload.amount,
         )
 
-    high_value_alert = payload.amount > 1000 and fraud_probability > 0.3
     if high_value_alert:
         _publish_sns_alert(prediction_id, fraud_probability, payload.amount)
 
@@ -369,18 +374,33 @@ async def explain(prediction_id: str) -> dict:
     return record
 
 
-@app.get("/override")
+@app.get("/override", response_model=list[PendingReviewItem])
 async def list_pending_reviews() -> list[dict]:
     """Return all predictions currently flagged for human review.
 
     Queries the requires-review-index GSI on fraud-audit-log.
-    Each record includes prediction_id, fraud_probability, shap_top3,
-    amount, requires_review, and timestamp.
+    Each record includes full decision-support context: SHAP top-3,
+    similar resolved cases, anomaly flags, and high-value alert status.
     """
     if _audit is None:
         raise HTTPException(status_code=503, detail="Service not ready")
 
     return await _audit.fetch_pending_reviews()
+
+
+@app.get("/warmup", response_model=WarmupResponse)
+def warmup() -> dict:
+    """Confirm container is warm without performing inference.
+
+    Intended for CloudWatch Events / EventBridge pings every 5 minutes
+    to keep at least one Lambda container live and the model bundle loaded.
+    Returns 200 always — even when the model bundle has not yet loaded.
+    """
+    return {
+        "status": "warm",
+        "model_loaded": _bundle is not None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/config")

@@ -230,3 +230,26 @@ class DriftReportResponse(BaseModel):
     overall_status: str = Field(description="One of: stable, monitor, action_required")
     features: list[dict]
     recommendation: str
+
+
+class PendingReviewItem(BaseModel):
+    """One pending review record returned by GET /override."""
+
+    prediction_id: str
+    fraud_probability: float
+    confidence_score: float = 0.0
+    shap_top3: list = Field(default_factory=list)
+    similar_cases: list = Field(default_factory=list)
+    amount: float
+    requires_review: bool
+    timestamp: str
+    anomaly_flags: list = Field(default_factory=list)
+    high_value_alert: bool = False
+
+
+class WarmupResponse(BaseModel):
+    """Response from GET /warmup."""
+
+    status: str
+    model_loaded: bool
+    timestamp: str
