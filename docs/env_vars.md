@@ -16,3 +16,14 @@
 | `HIGH_VALUE_SNS_ARN` | *(optional)* | SNS topic ARN for high-value fraud alerts (`Amount > 1000` and `fraud_probability > 0.3`). If unset, alerts are skipped with a warning log. |
 | `AWS_REGION` | `eu-central-1` | AWS region used by CloudWatch for `ComponentFailure` metric publishing (distinct from `AWS_DEFAULT_REGION` used by DynamoDB/SNS). |
 | `BIAS_SEGMENTS_PATH` | *(auto-resolved)* | Path to a JSON file defining bias evaluation segments. Defaults to `data/baselines/bias_segments.json`. Each entry must include `name`, `feature`, `threshold`, `comparison` (gt/gte/lt/lte), `fpr_multiplier_limit`, and `auprc_ratio_limit`. |
+
+## Retraining orchestrator
+
+The `src/monitoring/retraining_trigger.py` module is designed to run as a scheduled AWS Lambda triggered by CloudWatch Events (EventBridge) on a daily schedule. It reads 4 CloudWatch drift signals and dispatches the `train.yml` GitHub Actions workflow when 2 or more signals fire.
+
+| Variable | Default | Required | Description |
+|---|---|---|---|
+| `GITHUB_REPO` | *(none)* | Yes | GitHub repository in `owner/repo` format. Used to check in-progress workflow runs and dispatch `train.yml`. |
+| `GITHUB_TOKEN` | *(none)* | Yes | GitHub personal access token or Actions token with `actions:write` permission for workflow dispatch. |
+| `MODEL_S3_BUCKET` | *(none)* | No | S3 bucket containing the model bundle pkl. Used by the model age guard to skip retraining for recently-trained models (< 7 days). If unset, guard is skipped. |
+| `MODEL_S3_KEY` | `models/xgboost_fraud_v1.pkl` | No | S3 key for the model bundle pkl. Used alongside `MODEL_S3_BUCKET` for the model age guard. |
