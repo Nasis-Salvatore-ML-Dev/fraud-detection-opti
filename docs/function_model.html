@@ -1,404 +1,1619 @@
-<style>
-body{margin:0;padding:0}
-.legend{display:flex;flex-wrap:wrap;gap:12px;padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-secondary)}
-.legend-item{display:flex;align-items:center;gap:6px}
-.leg-line{width:28px;height:3px}
-.leg-green{background:#1D9E75}
-.leg-dash{background:transparent;border-top:2px dashed #1D9E75}
-.leg-red{background:#E24B4A}
-.leg-grey{background:transparent;border-top:1.5px dotted #888780}
-.leg-black{background:#2C2C2A;height:4px}
-svg text{font-family:var(--font-sans,sans-serif)}
-</style>
-<div class="legend">
-  <div class="legend-item"><div class="leg-line leg-green"></div><span>Useful</span></div>
-  <div class="legend-item"><div class="leg-line leg-dash"></div><span>Insufficient</span></div>
-  <div class="legend-item"><div class="leg-line leg-red"></div><span>Harmful</span></div>
-  <div class="legend-item"><div class="leg-line leg-grey"></div><span>Absent</span></div>
-  <div class="legend-item"><div class="leg-line leg-black"></div><span>Excessive</span></div>
-  <div class="legend-item"><svg width="36" height="16"><rect x="2" y="2" width="32" height="12" rx="6" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="3 2"/></svg><span>Supersystem node</span></div>
-  <div class="legend-item"><svg width="36" height="16"><rect x="2" y="2" width="32" height="12" rx="2" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="3 2"/></svg><span>Absent component</span></div>
-</div>
-<svg width="100%" viewBox="0 0 1100 1380" role="img">
-<title>TRIZ function model — fraud detection pipeline</title>
-<desc>Function model showing all pipeline components, supersystem nodes, and their useful, insufficient, harmful, and absent interactions.</desc>
-<defs>
-<marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round"/></marker>
-<marker id="r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#E24B4A" stroke-width="1.5" stroke-linecap="round"/></marker>
-<marker id="grey" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/></marker>
-<marker id="blk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#2C2C2A" stroke-width="1.5" stroke-linecap="round"/></marker>
-</defs>
-
-<!-- ── SUPERSYSTEM NODES (rounded rect, dashed border) ── -->
-<!-- Transaction System -->
-<rect x="20" y="20" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="110" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Transaction System</text>
-<text x="110" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Payment Gateway</text>
-
-<!-- Fraudulent Users -->
-<rect x="440" y="20" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="520" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Fraudulent Users</text>
-<text x="520" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Adversarial actors</text>
-
-<!-- Legitimate Customers -->
-<rect x="660" y="20" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="740" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Legitimate Customers</text>
-<text x="740" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Good transactions</text>
-
-<!-- Regulatory Bodies -->
-<rect x="880" y="20" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="38" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Regulatory Bodies</text>
-<text x="970" y="54" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">EU AI Act, GDPR</text>
-
-<!-- Fraud Analysts -->
-<rect x="880" y="580" width="180" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Fraud Analysts</text>
-<text x="970" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Manual review team</text>
-
-<!-- IT Infrastructure -->
-<rect x="20" y="580" width="160" height="44" rx="14" fill="var(--color-background-secondary)" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="100" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">IT Infrastructure</text>
-<text x="100" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">AWS Cloud, Lambda</text>
-
-<!-- ── PIPELINE COMPONENTS (solid rect) ── -->
-<!-- Raw Dataset -->
-<rect x="220" y="110" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="128" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Raw Dataset</text>
-<text x="300" y="144" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">creditcard.csv</text>
-
-<!-- Training Pipeline -->
-<rect x="220" y="220" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Training Pipeline</text>
-<text x="300" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">train.py</text>
-
-<!-- Hyperparameter Tuner -->
-<rect x="60" y="220" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="130" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">HPO Tuner</text>
-<text x="130" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">tune.py — never run</text>
-
-<!-- Feature Engineering -->
-<rect x="440" y="220" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Feature Engineering</text>
-<text x="520" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">preprocessing.py</text>
-
-<!-- Model Bundle -->
-<rect x="220" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Bundle</text>
-<text x="300" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">xgboost_v1.pkl</text>
-
-<!-- ONNX Exporter -->
-<rect x="60" y="340" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="130" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">ONNX Exporter</text>
-<text x="130" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">export_onnx.py</text>
-
-<!-- SHAP Background -->
-<rect x="440" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">SHAP Background</text>
-<text x="520" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">shap_background.pkl</text>
-
-<!-- Model Loader -->
-<rect x="220" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Loader</text>
-<text x="300" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">model_loader.py</text>
-
-<!-- Schema Validation -->
-<rect x="660" y="340" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="740" y="358" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Schema Validation</text>
-<text x="740" y="374" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">schemas.py</text>
-
-<!-- Inference API -->
-<rect x="440" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Inference API</text>
-<text x="520" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">app.py / FastAPI</text>
-
-<!-- Decision Threshold -->
-<rect x="660" y="460" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="740" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Decision Threshold</text>
-<text x="740" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">hardcoded in bundle</text>
-
-<!-- SHAP Explainer -->
-<rect x="660" y="580" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="740" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">SHAP Explainer</text>
-<text x="740" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">disabled — ABI crash</text>
-
-<!-- Audit Logger -->
-<rect x="440" y="580" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="598" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Audit Logger</text>
-<text x="520" y="614" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">DynamoDB append-only</text>
-
-<!-- Override Queue -->
-<rect x="440" y="700" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Override Queue</text>
-<text x="520" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">DynamoDB TTL 30d</text>
-
-<!-- Drift Monitor -->
-<rect x="220" y="700" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Drift Monitor</text>
-<text x="300" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">PSI — 4 features</text>
-
-<!-- PSI Baseline -->
-<rect x="60" y="700" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="130" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">PSI Baseline</text>
-<text x="130" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">training_baseline.json</text>
-
-<!-- Bias Tester -->
-<rect x="220" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="300" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Bias Tester</text>
-<text x="300" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">4 segments, CD gate</text>
-
-<!-- CI/CD Pipeline -->
-<rect x="60" y="820" width="140" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="130" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">CI/CD Pipeline</text>
-<text x="130" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">GitHub Actions</text>
-
-<!-- Model Card Generator -->
-<rect x="440" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="520" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Model Card Generator</text>
-<text x="520" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Mitchell et al.</text>
-
-<!-- Load Tester -->
-<rect x="660" y="820" width="160" height="44" rx="4" fill="var(--color-background-primary)" stroke="var(--color-border-secondary)" stroke-width="0.5"/>
-<text x="740" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-primary)">Load Tester</text>
-<text x="740" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">Locust — not in CD</text>
-
-<!-- ── ABSENT COMPONENTS (dashed rect) ── -->
-<!-- Online Feature Store -->
-<rect x="660" y="220" width="160" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="740" y="238" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Online Feature Store</text>
-<text x="740" y="254" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: velocity features)</text>
-
-<!-- Retraining Trigger -->
-<rect x="60" y="460" width="140" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="130" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Retraining Trigger</text>
-<text x="130" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: auto-retrain)</text>
-
-<!-- Calibrated Confidence -->
-<rect x="880" y="460" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="478" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Calibrated Confidence</text>
-<text x="970" y="494" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: Platt scaling)</text>
-
-<!-- Canary Deployer -->
-<rect x="880" y="820" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="838" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Canary Deployer</text>
-<text x="970" y="854" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: weighted alias)</text>
-
-<!-- Rule-Based Fallback -->
-<rect x="880" y="700" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="718" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Rule-Based Fallback</text>
-<text x="970" y="734" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: heuristic scorer)</text>
-
-<!-- ── ARROWS ── -->
-
-<!-- Transaction System → Raw Dataset: useful: supplies transactions -->
-<line x1="200" y1="42" x2="280" y2="110" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="225" y="76" font-size="9" fill="#1D9E75">useful: supplies</text>
-
-<!-- Transaction System → Schema Validation: useful: sends request -->
-<line x1="200" y1="55" x2="660" y2="362" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="370" y="180" font-size="9" fill="#1D9E75">useful: sends request</text>
-
-<!-- Fraudulent Users → Transaction System: harmful: injects fraud -->
-<line x1="440" y1="42" x2="200" y2="42" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="300" y="36" font-size="9" fill="#E24B4A">harmful: injects fraud</text>
-
-<!-- Legitimate Customers → Transaction System: useful: submits transaction -->
-<line x1="660" y1="42" x2="610" y2="42" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="620" y="36" font-size="9" fill="#1D9E75">useful: submits</text>
-
-<!-- Raw Dataset → Training Pipeline: useful: supplies labels -->
-<line x1="300" y1="154" x2="300" y2="220" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="306" y="192" font-size="9" fill="#1D9E75">useful: supplies labels</text>
-
-<!-- HPO Tuner → Training Pipeline: insufficient: optimises params -->
-<line x1="200" y1="242" x2="220" y2="242" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="148" y="234" font-size="9" fill="#1D9E75">insuff: optimises</text>
-
-<!-- Training Pipeline → Feature Engineering: useful: calls engineer -->
-<line x1="380" y1="242" x2="440" y2="242" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="388" y="234" font-size="9" fill="#1D9E75">useful: calls</text>
-
-<!-- Training Pipeline → Model Bundle: useful: produces model -->
-<line x1="300" y1="264" x2="300" y2="340" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="306" y="308" font-size="9" fill="#1D9E75">useful: produces</text>
-
-<!-- Training Pipeline → SHAP Background: useful: samples -->
-<line x1="380" y1="255" x2="440" y2="348" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="408" y="296" font-size="9" fill="#1D9E75">useful: samples</text>
-
-<!-- Training Pipeline → ONNX Exporter: insufficient: exports -->
-<line x1="220" y1="255" x2="200" y2="340" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="156" y="296" font-size="9" fill="#1D9E75">insuff: exports</text>
-
-<!-- Feature Engineering → Inference API: insufficient: transforms features -->
-<line x1="520" y1="264" x2="520" y2="460" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="526" y="370" font-size="9" fill="#1D9E75">insuff: transforms</text>
-
-<!-- Feature Engineering → Online Feature Store: absent -->
-<line x1="620" y1="242" x2="660" y2="242" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
-<text x="626" y="234" font-size="9" fill="#888780">absent: velocity</text>
-
-<!-- Feature Engineering: harmful: hardcoded constants → itself modelled as self-loop label -->
-<text x="442" y="214" font-size="9" fill="#E24B4A">harmful: skew via hardcoded constants</text>
-
-<!-- Model Bundle → Model Loader: useful: provides bundle -->
-<line x1="300" y1="384" x2="300" y2="460" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="306" y="428" font-size="9" fill="#1D9E75">useful: provides</text>
-
-<!-- Model Bundle: harmful: locks runtime -->
-<line x1="220" y1="362" x2="130" y2="362" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="136" y="354" font-size="9" fill="#E24B4A">harmful: locks runtime</text>
-
-<!-- SHAP Background → SHAP Explainer: insufficient: enables init -->
-<line x1="600" y1="362" x2="700" y2="580" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="636" y="470" font-size="9" fill="#1D9E75">insuff: enables init</text>
-
-<!-- Schema Validation → Inference API: insufficient: validates input -->
-<line x1="740" y1="384" x2="620" y2="460" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="660" y="420" font-size="9" fill="#1D9E75">insuff: validates</text>
-
-<!-- Model Loader → Inference API: useful: loads model -->
-<line x1="440" y1="482" x2="600" y2="482" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="450" y="474" font-size="9" fill="#1D9E75">useful: loads model</text>
-
-<!-- Inference API → Decision Threshold: useful: applies threshold -->
-<line x1="600" y1="482" x2="660" y2="482" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="604" y="474" font-size="9" fill="#1D9E75">useful: applies</text>
-
-<!-- Decision Threshold: harmful: rigid — no runtime adjust -->
-<line x1="820" y1="482" x2="880" y2="482" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="824" y="474" font-size="9" fill="#E24B4A">absent: runtime adjust</text>
-<rect x="880" y="461" width="180" height="44" rx="4" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 2"/>
-<text x="970" y="479" text-anchor="middle" font-size="11" font-weight="500" fill="var(--color-text-secondary)">Calibrated Confidence</text>
-<text x="970" y="495" text-anchor="middle" font-size="10" fill="var(--color-text-secondary)">(missing: Platt scaling)</text>
-
-<!-- Inference API → Audit Logger: useful: logs prediction -->
-<line x1="520" y1="504" x2="520" y2="580" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="526" y="546" font-size="9" fill="#1D9E75">useful: logs</text>
-
-<!-- Inference API → SHAP Explainer: harmful: crashes via ABI -->
-<line x1="600" y1="497" x2="660" y2="580" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="614" y="538" font-size="9" fill="#E24B4A">harmful: crashes ABI</text>
-
-<!-- Inference API → Rule-Based Fallback: absent -->
-<line x1="680" y1="497" x2="880" y2="718" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
-<text x="760" y="600" font-size="9" fill="#888780">absent: fallback</text>
-
-<!-- Inference API: harmful: fake confidence → Legitimate Customers -->
-<line x1="600" y1="470" x2="740" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="688" y="260" font-size="9" fill="#E24B4A">harmful: fake confidence</text>
-
-<!-- Decision Threshold → Legitimate Customers: harmful: false positive blocks -->
-<line x1="820" y1="470" x2="820" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="826" y="260" font-size="9" fill="#E24B4A">harmful: false positive</text>
-
-<!-- SHAP Explainer → Audit Logger: insufficient: populates SHAP values -->
-<line x1="700" y1="602" x2="600" y2="602" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="616" y="594" font-size="9" fill="#1D9E75">insuff: populates</text>
-
-<!-- Audit Logger → Drift Monitor: insufficient: feeds records -->
-<line x1="440" y1="610" x2="380" y2="710" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="380" y="658" font-size="9" fill="#1D9E75">insuff: feeds records</text>
-
-<!-- Audit Logger → Override Queue: useful: routes uncertain -->
-<line x1="520" y1="624" x2="520" y2="700" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="526" y="666" font-size="9" fill="#1D9E75">useful: routes</text>
-
-<!-- Audit Logger: harmful: missing V1-V28 → Regulatory Bodies -->
-<line x1="560" y1="580" x2="970" y2="64" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="800" y="300" font-size="9" fill="#E24B4A">harmful: incomplete record</text>
-
-<!-- PSI Baseline → Drift Monitor: useful: anchors baseline -->
-<line x1="200" y1="722" x2="220" y2="722" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="144" y="714" font-size="9" fill="#1D9E75">useful: anchors</text>
-
-<!-- Drift Monitor → IT Infrastructure: insufficient: publishes PSI -->
-<line x1="220" y1="722" x2="180" y2="622" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="156" y="676" font-size="9" fill="#1D9E75">insuff: publishes PSI</text>
-
-<!-- Drift Monitor → Retraining Trigger: absent -->
-<line x1="220" y1="738" x2="130" y2="460" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
-<text x="100" y="590" font-size="9" fill="#888780">absent: triggers retrain</text>
-
-<!-- Override Queue → Fraud Analysts: insufficient: routes for review -->
-<line x1="600" y1="722" x2="880" y2="602" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="700" y="658" font-size="9" fill="#1D9E75">insuff: routes review</text>
-
-<!-- Fraud Analysts → Override Queue: useful: resolves decision -->
-<line x1="880" y1="614" x2="760" y2="724" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="810" y="680" font-size="9" fill="#1D9E75">useful: resolves</text>
-
-<!-- Bias Tester → CI/CD Pipeline: useful: gates deployment -->
-<line x1="220" y1="842" x2="200" y2="842" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="148" y="834" font-size="9" fill="#1D9E75">useful: gates</text>
-
-<!-- Bias Tester: insufficient: evaluates fairness -->
-<line x1="300" y1="864" x2="300" y2="900" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="306" y="886" font-size="9" fill="#1D9E75">insuff: evaluates fairness</text>
-<text x="240" y="916" font-size="9" fill="var(--color-text-secondary)">(4 segments, no directional metric)</text>
-
-<!-- Bias Tester → Regulatory Bodies: insufficient: evidences compliance -->
-<line x1="380" y1="830" x2="880" y2="42" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="640" y="390" font-size="9" fill="#1D9E75">insuff: evidences</text>
-
-<!-- CI/CD → Canary Deployer: absent -->
-<line x1="200" y1="842" x2="880" y2="842" stroke="#888780" stroke-width="1" stroke-dasharray="3 2" fill="none" marker-end="url(#grey)"/>
-<text x="480" y="834" font-size="9" fill="#888780">absent: canary deploy</text>
-
-<!-- CI/CD: harmful: static IAM keys → IT Infrastructure -->
-<line x1="130" y1="820" x2="100" y2="624" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="50" y="720" font-size="9" fill="#E24B4A">harmful: static keys</text>
-
-<!-- Model Card Generator → Regulatory Bodies: useful: documents model -->
-<line x1="600" y1="830" x2="970" y2="64" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="820" y="430" font-size="9" fill="#1D9E75">useful: documents</text>
-
-<!-- Load Tester → Inference API: insufficient: measures latency -->
-<line x1="740" y1="820" x2="620" y2="504" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 3" fill="none" marker-end="url(#g)"/>
-<text x="706" y="660" font-size="9" fill="#1D9E75">insuff: measures latency</text>
-
-<!-- IT Infrastructure → Model Loader: useful: hosts Lambda -->
-<line x1="180" y1="602" x2="220" y2="478" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="142" y="538" font-size="9" fill="#1D9E75">useful: hosts</text>
-
-<!-- Regulatory Bodies → Pipeline (Audit Logger): useful: mandates logging -->
-<line x1="970" y1="64" x2="600" y2="580" stroke="#1D9E75" stroke-width="1.5" fill="none" marker-end="url(#g)"/>
-<text x="830" y="340" font-size="9" fill="#1D9E75">useful: mandates log</text>
-
-<!-- Fraudulent Users → Inference API: harmful: adversarial inputs -->
-<line x1="520" y1="64" x2="520" y2="460" stroke="#E24B4A" stroke-width="1.5" fill="none" marker-end="url(#r)"/>
-<text x="526" y="270" font-size="9" fill="#E24B4A">harmful: adversarial inputs</text>
-
-<!-- ── CONTRADICTION ANNOTATIONS ── -->
-<rect x="20" y="960" width="1060" height="400" rx="6" fill="var(--color-background-secondary)" stroke="var(--color-border-tertiary)" stroke-width="0.5"/>
-<text x="40" y="990" font-size="12" font-weight="500" fill="var(--color-text-primary)">Contradictions (useful / harmful between same pair)</text>
-
-<text x="40" y="1014" font-size="11" font-weight="500" fill="#E24B4A">C1</text>
-<text x="60" y="1014" font-size="11" fill="var(--color-text-primary)">Inference API → Legitimate Customers: useful: approves legitimate  |  harmful: false positive blocks legitimate</text>
-<text x="40" y="1034" font-size="11" font-weight="500" fill="#E24B4A">C2</text>
-<text x="60" y="1034" font-size="11" fill="var(--color-text-primary)">Inference API → SHAP Explainer: useful: calls explainer  |  harmful: crashes explainer via ABI mismatch</text>
-<text x="40" y="1054" font-size="11" font-weight="500" fill="#E24B4A">C3</text>
-<text x="60" y="1054" font-size="11" fill="var(--color-text-primary)">Audit Logger → Regulatory Bodies: useful: evidences compliance  |  harmful: incomplete record violates Art. 12</text>
-<text x="40" y="1074" font-size="11" font-weight="500" fill="#E24B4A">C4</text>
-<text x="60" y="1074" font-size="11" fill="var(--color-text-primary)">Decision Threshold → Fraudulent Users: useful: blocks fraud  |  harmful: rigid threshold misses adaptive fraud patterns</text>
-<text x="40" y="1094" font-size="11" font-weight="500" fill="#E24B4A">C5</text>
-<text x="60" y="1094" font-size="11" fill="var(--color-text-primary)">Model Bundle → Model Loader: useful: provides model  |  harmful: pickle lock-in creates silent version skew</text>
-<text x="40" y="1114" font-size="11" font-weight="500" fill="#E24B4A">C6</text>
-<text x="60" y="1114" font-size="11" fill="var(--color-text-primary)">CI/CD Pipeline → IT Infrastructure: useful: deploys service  |  harmful: static IAM keys expose cloud credentials</text>
-<text x="40" y="1134" font-size="11" font-weight="500" fill="#E24B4A">C7</text>
-<text x="60" y="1134" font-size="11" fill="var(--color-text-primary)">Bias Tester → Regulatory Bodies: useful: gates biased models  |  insufficient: 4 segments miss directional bias</text>
-
-<text x="40" y="1166" font-size="12" font-weight="500" fill="var(--color-text-primary)">Absent functions</text>
-<text x="40" y="1186" font-size="11" fill="var(--color-text-primary)">• Online Feature Store — absent: velocity feature aggregation per card / merchant</text>
-<text x="40" y="1202" font-size="11" fill="var(--color-text-primary)">• Retraining Trigger — absent: automated multi-signal retraining initiation</text>
-<text x="40" y="1218" font-size="11" fill="var(--color-text-primary)">• Calibrated Confidence — absent: Platt-scaled uncertainty score per prediction</text>
-<text x="40" y="1234" font-size="11" fill="var(--color-text-primary)">• Rule-Based Fallback — absent: heuristic scorer on model failure</text>
-<text x="40" y="1250" font-size="11" fill="var(--color-text-primary)">• Canary Deployer — absent: weighted Lambda alias for gradual rollout</text>
-
-<text x="40" y="1278" font-size="12" font-weight="500" fill="var(--color-text-primary)">Harmful functions</text>
-<text x="40" y="1298" font-size="11" fill="var(--color-text-primary)">• Fraudulent Users → Transaction System: injects adversarial transactions</text>
-<text x="40" y="1314" font-size="11" fill="var(--color-text-primary)">• Inference API → Legitimate Customers: false positive blocks legitimate transactions</text>
-<text x="40" y="1330" font-size="11" fill="var(--color-text-primary)">• Inference API → Legitimate Customers: fake confidence score misleads downstream consumers</text>
-<text x="40" y="1346" font-size="11" fill="var(--color-text-primary)">• Inference API → SHAP Explainer: ABI crash disables explainability at runtime</text>
-<text x="40" y="1362" font-size="11" fill="var(--color-text-primary)">• Model Bundle → ONNX Exporter: pickle lock-in silently supersedes verified ONNX artifact</text>
-<text x="40" y="1378" font-size="11" fill="var(--color-text-primary)">• CI/CD Pipeline → IT Infrastructure: static IAM keys create persistent credential exposure</text>
-</svg>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TRIZ Function Model — Fraud Detection Pipeline</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+          sans-serif;
+        background: #f8f7f4;
+        color: #1a1a18;
+      }
+
+      header {
+        padding: 24px 32px 16px;
+        border-bottom: 1px solid #e0ded6;
+      }
+      header h1 {
+        font-size: 18px;
+        font-weight: 500;
+      }
+      header p {
+        font-size: 13px;
+        color: #6b6a63;
+        margin-top: 4px;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 14px 32px;
+        border-bottom: 1px solid #e0ded6;
+        background: #fdfcf9;
+      }
+      .leg {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #444441;
+      }
+      .leg-line {
+        width: 32px;
+        height: 3px;
+        border-radius: 2px;
+      }
+      .leg-green {
+        background: #1d9e75;
+      }
+      .leg-gdash {
+        background: none;
+        border-top: 2.5px dashed #1d9e75;
+      }
+      .leg-red {
+        background: #e24b4a;
+      }
+      .leg-grey {
+        background: none;
+        border-top: 1.5px dotted #888780;
+      }
+      .leg-swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+      }
+      .sw-pipe {
+        background: #d2ebf5;
+      }
+      .sw-sys {
+        background: #fff0d6;
+      }
+      .sw-mon {
+        background: #e5f6ee;
+      }
+      .sw-absent {
+        background: #f5f5f2;
+        border: 1.5px dashed #888780;
+      }
+
+      .canvas-wrap {
+        overflow: auto;
+        padding: 24px 32px 40px;
+      }
+
+      svg text {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+          sans-serif;
+      }
+
+      /* node colours — solid fills, dark text */
+      .n-pipe {
+        fill: #d2ebf5;
+        stroke: #2a86b0;
+      }
+      .n-sys {
+        fill: #fff0d6;
+        stroke: #b07a28;
+      }
+      .n-mon {
+        fill: #e5f6ee;
+        stroke: #1d9e75;
+      }
+      .n-api {
+        fill: #ede8fb;
+        stroke: #6e52cc;
+      }
+      .n-absent {
+        fill: #f5f5f2;
+        stroke: #888780;
+        stroke-dasharray: 5 3;
+      }
+      .n-super {
+        fill: #fef9f0;
+        stroke: #c89040;
+        stroke-dasharray: 4 2;
+      }
+
+      .lbl-pipe {
+        fill: #0c5a80;
+      }
+      .lbl-sys {
+        fill: #7a5210;
+      }
+      .lbl-mon {
+        fill: #0f6e56;
+      }
+      .lbl-api {
+        fill: #3e2a99;
+      }
+      .lbl-absent {
+        fill: #5f5e5a;
+      }
+      .lbl-super {
+        fill: #8a6010;
+      }
+      .lbl-sub {
+        fill: #6b6a63;
+        font-size: 10px;
+      }
+
+      .arr-g {
+        stroke: #1d9e75;
+        fill: none;
+        stroke-width: 1.5;
+      }
+      .arr-gd {
+        stroke: #1d9e75;
+        fill: none;
+        stroke-width: 1.5;
+        stroke-dasharray: 6 3;
+      }
+      .arr-r {
+        stroke: #e24b4a;
+        fill: none;
+        stroke-width: 1.5;
+      }
+      .arr-grey {
+        stroke: #888780;
+        fill: none;
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+      }
+
+      .lbl-arr-g {
+        fill: #0f6e56;
+        font-size: 10px;
+      }
+      .lbl-arr-r {
+        fill: #a32d2d;
+        font-size: 10px;
+      }
+      .lbl-arr-i {
+        fill: #1d6e50;
+        font-size: 10px;
+      }
+      .lbl-arr-a {
+        fill: #5f5e5a;
+        font-size: 10px;
+      }
+
+      .section-title {
+        fill: #888780;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+      }
+
+      .problems {
+        padding: 0 32px 40px;
+      }
+      .problems h2 {
+        font-size: 15px;
+        font-weight: 500;
+        margin-bottom: 16px;
+        padding-top: 24px;
+        border-top: 1px solid #e0ded6;
+      }
+      .prob-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .prob-col h3 {
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 10px;
+      }
+      .prob-col.harmful h3 {
+        color: #a32d2d;
+      }
+      .prob-col.insuff h3 {
+        color: #0f6e56;
+      }
+      .prob-col.absent h3 {
+        color: #5f5e5a;
+      }
+      .prob-col.contra h3 {
+        color: #6e52cc;
+      }
+      ul {
+        list-style: none;
+      }
+      li {
+        font-size: 12px;
+        line-height: 1.7;
+        color: #3d3d3a;
+        padding: 3px 0;
+        border-bottom: 1px solid #edece8;
+      }
+      li:last-child {
+        border-bottom: none;
+      }
+      li span {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .dot-r {
+        background: #e24b4a;
+      }
+      .dot-g {
+        background: #1d9e75;
+      }
+      .dot-gr {
+        background: #888780;
+      }
+      .dot-p {
+        background: #6e52cc;
+      }
+      @media (max-width: 700px) {
+        .prob-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>TRIZ Function Model — Fraud Detection Pipeline v1 baseline</h1>
+      <p>
+        Each arrow encodes the type of interaction between pipeline components
+        and supersystem actors.
+      </p>
+    </header>
+
+    <div class="legend">
+      <div class="leg">
+        <div class="leg-line leg-green"></div>
+        Useful
+      </div>
+      <div class="leg">
+        <div class="leg-line leg-gdash"></div>
+        Insufficient
+      </div>
+      <div class="leg">
+        <div class="leg-line leg-red"></div>
+        Harmful
+      </div>
+      <div class="leg">
+        <div class="leg-line leg-grey"></div>
+        Absent
+      </div>
+      <div class="leg">
+        <div class="leg-swatch sw-pipe"></div>
+        Training / data components
+      </div>
+      <div class="leg">
+        <div class="leg-swatch sw-sys"></div>
+        Supersystem actors
+      </div>
+      <div class="leg">
+        <div class="leg-swatch sw-mon"></div>
+        Monitoring components
+      </div>
+      <div class="leg">
+        <div class="leg-swatch sw-absent"></div>
+        Absent component
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <svg width="1300" height="1060" viewBox="0 0 1300 1060" role="img">
+        <title>
+          TRIZ function model of the fraud detection pipeline baseline
+        </title>
+        <desc>
+          Directed graph showing useful (green solid), insufficient (green
+          dashed), harmful (red solid), and absent (grey dotted) interactions
+          between all pipeline components and external supersystem actors.
+        </desc>
+
+        <defs>
+          <marker
+            id="mg"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path
+              d="M2 1L8 5L2 9"
+              fill="none"
+              stroke="#1D9E75"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </marker>
+          <marker
+            id="mr"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path
+              d="M2 1L8 5L2 9"
+              fill="none"
+              stroke="#E24B4A"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </marker>
+          <marker
+            id="mgy"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path
+              d="M2 1L8 5L2 9"
+              fill="none"
+              stroke="#888780"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </marker>
+        </defs>
+
+        <!-- ═══════════════════════════════════════════════════
+     ROW 1 — Supersystem actors (top)
+════════════════════════════════════════════════════ -->
+        <text class="section-title" x="30" y="28">SUPERSYSTEM</text>
+
+        <!-- Transaction System -->
+        <rect class="n-super" x="30" y="38" width="180" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="120"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Transaction System
+        </text>
+        <text class="lbl-sub" x="120" y="76" text-anchor="middle">
+          Payment gateway
+        </text>
+
+        <!-- Fraudulent Users -->
+        <rect class="n-super" x="260" y="38" width="160" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="340"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Fraudulent Users
+        </text>
+        <text class="lbl-sub" x="340" y="76" text-anchor="middle">
+          Adversarial actors
+        </text>
+
+        <!-- Legitimate Customers -->
+        <rect class="n-super" x="470" y="38" width="170" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="555"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Legitimate Customers
+        </text>
+        <text class="lbl-sub" x="555" y="76" text-anchor="middle">
+          Good transactions
+        </text>
+
+        <!-- Regulatory Bodies -->
+        <rect class="n-super" x="700" y="38" width="170" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="785"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Regulatory Bodies
+        </text>
+        <text class="lbl-sub" x="785" y="76" text-anchor="middle">
+          EU AI Act / GDPR
+        </text>
+
+        <!-- Fraud Analysts -->
+        <rect class="n-super" x="930" y="38" width="160" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="1010"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Fraud Analysts
+        </text>
+        <text class="lbl-sub" x="1010" y="76" text-anchor="middle">
+          Manual review team
+        </text>
+
+        <!-- IT Infrastructure -->
+        <rect class="n-super" x="1150" y="38" width="120" height="52" rx="12" />
+        <text
+          class="lbl-super"
+          x="1210"
+          y="60"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          IT Infra
+        </text>
+        <text class="lbl-sub" x="1210" y="76" text-anchor="middle">
+          AWS / Lambda
+        </text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ROW 2 — Training path
+════════════════════════════════════════════════════ -->
+        <text class="section-title" x="30" y="148">TRAINING PATH</text>
+
+        <!-- Raw Dataset -->
+        <rect class="n-pipe" x="30" y="158" width="150" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="105"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Raw Dataset
+        </text>
+        <text class="lbl-sub" x="105" y="196" text-anchor="middle">
+          creditcard.csv
+        </text>
+
+        <!-- Training Pipeline -->
+        <rect class="n-pipe" x="230" y="158" width="160" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="310"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Training Pipeline
+        </text>
+        <text class="lbl-sub" x="310" y="196" text-anchor="middle">
+          train.py
+        </text>
+
+        <!-- HPO Tuner (insufficient) -->
+        <rect class="n-pipe" x="440" y="158" width="150" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="515"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          HPO Tuner
+        </text>
+        <text class="lbl-sub" x="515" y="196" text-anchor="middle">
+          tune.py — never run
+        </text>
+
+        <!-- Feature Engineering -->
+        <rect class="n-pipe" x="640" y="158" width="165" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="722"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Feature Engineering
+        </text>
+        <text class="lbl-sub" x="722" y="196" text-anchor="middle">
+          preprocessing.py
+        </text>
+
+        <!-- ONNX Exporter (insufficient) -->
+        <rect class="n-pipe" x="860" y="158" width="150" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="935"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          ONNX Exporter
+        </text>
+        <text class="lbl-sub" x="935" y="196" text-anchor="middle">
+          not served — unused
+        </text>
+
+        <!-- Model Card Generator -->
+        <rect class="n-mon" x="1060" y="158" width="160" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="1140"
+          y="180"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Model Card Gen.
+        </text>
+        <text class="lbl-sub" x="1140" y="196" text-anchor="middle">
+          Mitchell et al.
+        </text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ROW 3 — Model artifacts
+════════════════════════════════════════════════════ -->
+        <text class="section-title" x="30" y="268">MODEL ARTIFACTS</text>
+
+        <!-- Model Bundle -->
+        <rect class="n-pipe" x="30" y="278" width="150" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="105"
+          y="300"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Model Bundle
+        </text>
+        <text class="lbl-sub" x="105" y="316" text-anchor="middle">
+          xgboost_v1.pkl
+        </text>
+
+        <!-- PSI Baseline -->
+        <rect class="n-mon" x="230" y="278" width="150" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="305"
+          y="300"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          PSI Baseline
+        </text>
+        <text class="lbl-sub" x="305" y="316" text-anchor="middle">
+          4 features only
+        </text>
+
+        <!-- SHAP Background -->
+        <rect class="n-pipe" x="430" y="278" width="155" height="52" rx="6" />
+        <text
+          class="lbl-pipe"
+          x="507"
+          y="300"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          SHAP Background
+        </text>
+        <text class="lbl-sub" x="507" y="316" text-anchor="middle">
+          shap_background.pkl
+        </text>
+
+        <!-- Model Loader -->
+        <rect class="n-api" x="635" y="278" width="150" height="52" rx="6" />
+        <text
+          class="lbl-api"
+          x="710"
+          y="300"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Model Loader
+        </text>
+        <text class="lbl-sub" x="710" y="316" text-anchor="middle">
+          model_loader.py
+        </text>
+
+        <!-- SHAP Explainer (harmful — OP=0) -->
+        <rect class="n-api" x="835" y="278" width="160" height="52" rx="6" />
+        <text
+          class="lbl-api"
+          x="915"
+          y="300"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          SHAP Explainer
+        </text>
+        <text class="lbl-sub" x="915" y="316" text-anchor="middle">
+          disabled — ABI crash
+        </text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ROW 4 — Serving path
+════════════════════════════════════════════════════ -->
+        <text class="section-title" x="30" y="388">SERVING PATH</text>
+
+        <!-- Schema Validation -->
+        <rect class="n-api" x="30" y="398" width="160" height="52" rx="6" />
+        <text
+          class="lbl-api"
+          x="110"
+          y="420"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Schema Validation
+        </text>
+        <text class="lbl-sub" x="110" y="436" text-anchor="middle">
+          schemas.py
+        </text>
+
+        <!-- Inference API -->
+        <rect class="n-api" x="240" y="398" width="155" height="52" rx="6" />
+        <text
+          class="lbl-api"
+          x="317"
+          y="420"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Inference API
+        </text>
+        <text class="lbl-sub" x="317" y="436" text-anchor="middle">
+          app.py / FastAPI
+        </text>
+
+        <!-- Decision Threshold -->
+        <rect class="n-api" x="445" y="398" width="165" height="52" rx="6" />
+        <text
+          class="lbl-api"
+          x="527"
+          y="420"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Decision Threshold
+        </text>
+        <text class="lbl-sub" x="527" y="436" text-anchor="middle">
+          hardcoded in bundle
+        </text>
+
+        <!-- Absent: Rule-based fallback -->
+        <rect class="n-absent" x="660" y="398" width="165" height="52" rx="6" />
+        <text
+          class="lbl-absent"
+          x="742"
+          y="418"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="500"
+        >
+          Rule-Based Fallback
+        </text>
+        <text
+          class="lbl-absent"
+          x="742"
+          y="434"
+          text-anchor="middle"
+          font-size="10"
+        >
+          (missing)
+        </text>
+
+        <!-- Absent: Calibrated Confidence -->
+        <rect class="n-absent" x="875" y="398" width="165" height="52" rx="6" />
+        <text
+          class="lbl-absent"
+          x="957"
+          y="418"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="500"
+        >
+          Calibrated Confidence
+        </text>
+        <text
+          class="lbl-absent"
+          x="957"
+          y="434"
+          text-anchor="middle"
+          font-size="10"
+        >
+          (missing — Platt scaling)
+        </text>
+
+        <!-- Absent: Online Feature Store -->
+        <rect
+          class="n-absent"
+          x="1090"
+          y="398"
+          width="165"
+          height="52"
+          rx="6"
+        />
+        <text
+          class="lbl-absent"
+          x="1172"
+          y="418"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="500"
+        >
+          Online Feature Store
+        </text>
+        <text
+          class="lbl-absent"
+          x="1172"
+          y="434"
+          text-anchor="middle"
+          font-size="10"
+        >
+          (missing — velocity)
+        </text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ROW 5 — Monitoring
+════════════════════════════════════════════════════ -->
+        <text class="section-title" x="30" y="510">MONITORING</text>
+
+        <!-- Audit Logger -->
+        <rect class="n-mon" x="30" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="107"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Audit Logger
+        </text>
+        <text class="lbl-sub" x="107" y="558" text-anchor="middle">
+          DynamoDB append-only
+        </text>
+
+        <!-- Override Queue -->
+        <rect class="n-mon" x="235" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="312"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Override Queue
+        </text>
+        <text class="lbl-sub" x="312" y="558" text-anchor="middle">
+          DynamoDB TTL 30d
+        </text>
+
+        <!-- Drift Monitor -->
+        <rect class="n-mon" x="440" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="517"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Drift Monitor
+        </text>
+        <text class="lbl-sub" x="517" y="558" text-anchor="middle">
+          PSI — 4 features
+        </text>
+
+        <!-- Bias Tester -->
+        <rect class="n-mon" x="645" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="722"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Bias Tester
+        </text>
+        <text class="lbl-sub" x="722" y="558" text-anchor="middle">
+          4 segments, CD gate
+        </text>
+
+        <!-- CI/CD Pipeline -->
+        <rect class="n-mon" x="850" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="927"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          CI/CD Pipeline
+        </text>
+        <text class="lbl-sub" x="927" y="558" text-anchor="middle">
+          GitHub Actions
+        </text>
+
+        <!-- Load Tester -->
+        <rect class="n-mon" x="1055" y="520" width="155" height="52" rx="6" />
+        <text
+          class="lbl-mon"
+          x="1132"
+          y="542"
+          text-anchor="middle"
+          font-size="12"
+          font-weight="500"
+        >
+          Load Tester
+        </text>
+        <text class="lbl-sub" x="1132" y="558" text-anchor="middle">
+          Locust — not in CD
+        </text>
+
+        <!-- Absent: Retraining Trigger -->
+        <rect class="n-absent" x="30" y="630" width="155" height="52" rx="6" />
+        <text
+          class="lbl-absent"
+          x="107"
+          y="650"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="500"
+        >
+          Retraining Trigger
+        </text>
+        <text
+          class="lbl-absent"
+          x="107"
+          y="666"
+          text-anchor="middle"
+          font-size="10"
+        >
+          (missing)
+        </text>
+
+        <!-- Absent: Canary Deployer -->
+        <rect class="n-absent" x="235" y="630" width="155" height="52" rx="6" />
+        <text
+          class="lbl-absent"
+          x="312"
+          y="650"
+          text-anchor="middle"
+          font-size="11"
+          font-weight="500"
+        >
+          Canary Deployer
+        </text>
+        <text
+          class="lbl-absent"
+          x="312"
+          y="666"
+          text-anchor="middle"
+          font-size="10"
+        >
+          (missing — weighted alias)
+        </text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ARROWS — Training path
+════════════════════════════════════════════════════ -->
+
+        <!-- Transaction System → Raw Dataset (useful) -->
+        <line
+          class="arr-g"
+          x1="120"
+          y1="90"
+          x2="100"
+          y2="156"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="82" y="130">useful: supplies</text>
+
+        <!-- Fraudulent Users → Transaction System (harmful) -->
+        <line
+          class="arr-r"
+          x1="260"
+          y1="62"
+          x2="210"
+          y2="62"
+          marker-end="url(#mr)"
+        />
+        <text class="lbl-arr-r" x="212" y="55">harmful: injects fraud</text>
+
+        <!-- Legitimate Customers → Transaction System (useful) -->
+        <line
+          class="arr-g"
+          x1="470"
+          y1="64"
+          x2="212"
+          y2="64"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="310" y="58">useful: submits</text>
+
+        <!-- Raw Dataset → Training Pipeline (useful) -->
+        <line
+          class="arr-g"
+          x1="180"
+          y1="184"
+          x2="228"
+          y2="184"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="182" y="178">useful: supplies labels</text>
+
+        <!-- Training Pipeline → Feature Engineering (useful) -->
+        <line
+          class="arr-g"
+          x1="390"
+          y1="184"
+          x2="438"
+          y2="184"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="392" y="178">useful: calls</text>
+
+        <!-- HPO Tuner → Training Pipeline (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="516"
+          y1="210"
+          x2="350"
+          y2="210"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="390" y="224">
+          insuff: optimises (never run)
+        </text>
+
+        <!-- Training Pipeline → Model Bundle (useful) -->
+        <line
+          class="arr-g"
+          x1="280"
+          y1="210"
+          x2="130"
+          y2="276"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="156" y="252">useful: produces</text>
+
+        <!-- Training Pipeline → PSI Baseline (useful) -->
+        <line
+          class="arr-g"
+          x1="310"
+          y1="210"
+          x2="305"
+          y2="276"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="316" y="252">useful: computes</text>
+
+        <!-- Training Pipeline → SHAP Background (useful) -->
+        <line
+          class="arr-g"
+          x1="360"
+          y1="210"
+          x2="480"
+          y2="276"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="382" y="246">useful: samples</text>
+
+        <!-- Training Pipeline → ONNX Exporter (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="390"
+          y1="184"
+          x2="858"
+          y2="184"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="620" y="178">insuff: exports (unused)</text>
+
+        <!-- Training Pipeline → Model Card Gen (useful) -->
+        <line
+          class="arr-g"
+          x1="390"
+          y1="196"
+          x2="1058"
+          y2="196"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="700" y="206">useful: documents</text>
+
+        <!-- Model Card Gen → Regulatory Bodies (useful) -->
+        <line
+          class="arr-g"
+          x1="1140"
+          y1="158"
+          x2="820"
+          y2="90"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="990" y="120">useful: evidences Art.11</text>
+
+        <!-- Model Bundle → Model Loader (useful) -->
+        <line
+          class="arr-g"
+          x1="180"
+          y1="304"
+          x2="633"
+          y2="304"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="350" y="298">useful: provides model</text>
+
+        <!-- Model Bundle: harmful — pickle locks portability (label only) -->
+        <text class="lbl-arr-r" x="32" y="274">harmful: pickle lock-in ↓</text>
+
+        <!-- PSI Baseline → Drift Monitor (useful) -->
+        <line
+          class="arr-g"
+          x1="380"
+          y1="318"
+          x2="462"
+          y2="520"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="398" y="430">useful: anchors</text>
+
+        <!-- SHAP Background → SHAP Explainer (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="585"
+          y1="304"
+          x2="835"
+          y2="304"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="670" y="298">
+          insuff: enables (explainer disabled)
+        </text>
+
+        <!-- Model Loader → Inference API (useful) -->
+        <line
+          class="arr-g"
+          x1="710"
+          y1="330"
+          x2="360"
+          y2="396"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="480" y="372">useful: loads model</text>
+
+        <!-- SHAP Explainer → Audit Logger (insufficient — OP=0) -->
+        <line
+          class="arr-gd"
+          x1="835"
+          y1="322"
+          x2="190"
+          y2="520"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="420" y="440">
+          insuff: populates SHAP (OP=0)
+        </text>
+
+        <!-- SHAP Explainer crashes via ABI (harmful) -->
+        <line
+          class="arr-r"
+          x1="395"
+          y1="398"
+          x2="835"
+          y2="316"
+          marker-end="url(#mr)"
+        />
+        <text class="lbl-arr-r" x="560" y="346">harmful: crashes via ABI</text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ARROWS — Serving path
+════════════════════════════════════════════════════ -->
+
+        <!-- Transaction System → Schema Validation (useful) -->
+        <line
+          class="arr-g"
+          x1="120"
+          y1="90"
+          x2="110"
+          y2="396"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="56" y="330">useful: sends request</text>
+
+        <!-- Schema Validation → Inference API (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="190"
+          y1="424"
+          x2="238"
+          y2="424"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="192" y="440">
+          insuff: validates (no range checks)
+        </text>
+
+        <!-- Inference API → Decision Threshold (useful) -->
+        <line
+          class="arr-g"
+          x1="395"
+          y1="424"
+          x2="443"
+          y2="424"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="397" y="418">useful: applies</text>
+
+        <!-- Inference API → Audit Logger (useful) -->
+        <line
+          class="arr-g"
+          x1="317"
+          y1="450"
+          x2="130"
+          y2="518"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="175" y="492">useful: logs</text>
+
+        <!-- Inference API → Override Queue (useful) -->
+        <line
+          class="arr-g"
+          x1="350"
+          y1="450"
+          x2="312"
+          y2="518"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="358" y="492">useful: routes uncertain</text>
+
+        <!-- Inference API → Rule-Based Fallback (absent) -->
+        <line
+          class="arr-grey"
+          x1="395"
+          y1="440"
+          x2="658"
+          y2="440"
+          marker-end="url(#mgy)"
+        />
+        <text class="lbl-arr-a" x="480" y="456">absent: fallback</text>
+
+        <!-- Inference API → Calibrated Confidence (absent) -->
+        <line
+          class="arr-grey"
+          x1="610"
+          y1="424"
+          x2="873"
+          y2="424"
+          marker-end="url(#mgy)"
+        />
+        <text class="lbl-arr-a" x="650" y="418">absent: calibration</text>
+
+        <!-- Inference API → Legitimate Customers (harmful: false positive) -->
+        <line
+          class="arr-r"
+          x1="395"
+          y1="400"
+          x2="555"
+          y2="92"
+          marker-end="url(#mr)"
+        />
+        <text class="lbl-arr-r" x="496" y="236">harmful: false positive</text>
+
+        <!-- Inference API: harmful — fake confidence → customers -->
+        <text class="lbl-arr-r" x="242" y="394">
+          harmful: fake confidence ↑
+        </text>
+
+        <!-- Decision Threshold: harmful — rigid, misses adaptive patterns -->
+        <text class="lbl-arr-r" x="447" y="394">
+          harmful: rigid, blocks adaptive
+        </text>
+
+        <!-- Feature Engineering: harmful — train-serve skew -->
+        <text class="lbl-arr-r" x="640" y="154">
+          harmful: hardcoded mean/std
+        </text>
+
+        <!-- Feature Engineering → Online Feature Store (absent) -->
+        <line
+          class="arr-grey"
+          x1="807"
+          y1="424"
+          x2="1088"
+          y2="424"
+          marker-end="url(#mgy)"
+        />
+        <text class="lbl-arr-a" x="900" y="418">absent: velocity features</text>
+
+        <!-- ═══════════════════════════════════════════════════
+     ARROWS — Monitoring
+════════════════════════════════════════════════════ -->
+
+        <!-- Audit Logger → Drift Monitor (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="185"
+          y1="546"
+          x2="438"
+          y2="546"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="222" y="540">insuff: feeds (no V1–V28)</text>
+
+        <!-- Audit Logger → Regulatory Bodies (insufficient — Art.12) -->
+        <line
+          class="arr-gd"
+          x1="185"
+          y1="528"
+          x2="700"
+          y2="68"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="380" y="290">
+          insuff: incomplete record (Art.12)
+        </text>
+
+        <!-- Override Queue → Fraud Analysts (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="390"
+          y1="546"
+          x2="968"
+          y2="90"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="690" y="308">insuff: no SHAP context</text>
+
+        <!-- Fraud Analysts → Override Queue (useful: resolves) -->
+        <line
+          class="arr-g"
+          x1="970"
+          y1="90"
+          x2="430"
+          y2="556"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="750" y="376">useful: resolves decision</text>
+
+        <!-- Drift Monitor (insufficient) → IT Infra -->
+        <line
+          class="arr-gd"
+          x1="595"
+          y1="546"
+          x2="1170"
+          y2="90"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="840" y="290">
+          insuff: publishes PSI (4 feat only)
+        </text>
+
+        <!-- Drift Monitor → Retraining Trigger (absent) -->
+        <line
+          class="arr-grey"
+          x1="517"
+          y1="572"
+          x2="185"
+          y2="630"
+          marker-end="url(#mgy)"
+        />
+        <text class="lbl-arr-a" x="250" y="616">absent: triggers retrain</text>
+
+        <!-- Bias Tester → CI/CD (useful: gates) -->
+        <line
+          class="arr-g"
+          x1="800"
+          y1="546"
+          x2="852"
+          y2="546"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="802" y="540">useful: gates deploy</text>
+
+        <!-- Bias Tester → Regulatory Bodies (insufficient: 4 segments) -->
+        <line
+          class="arr-gd"
+          x1="722"
+          y1="520"
+          x2="785"
+          y2="92"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="764" y="300">insuff: 4 segs (Art.10)</text>
+
+        <!-- CI/CD → IT Infra (useful) -->
+        <line
+          class="arr-g"
+          x1="1005"
+          y1="546"
+          x2="1170"
+          y2="90"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="1100" y="300">useful: deploys</text>
+
+        <!-- CI/CD: harmful — static IAM keys -->
+        <text class="lbl-arr-r" x="852" y="516">
+          harmful: static IAM keys ↑
+        </text>
+
+        <!-- CI/CD → Canary Deployer (absent) -->
+        <line
+          class="arr-grey"
+          x1="927"
+          y1="572"
+          x2="387"
+          y2="630"
+          marker-end="url(#mgy)"
+        />
+        <text class="lbl-arr-a" x="560" y="624">absent: canary rollout</text>
+
+        <!-- Load Tester → Inference API (insufficient) -->
+        <line
+          class="arr-gd"
+          x1="1132"
+          y1="520"
+          x2="395"
+          y2="450"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-i" x="750" y="498">
+          insuff: latency check (not in CD)
+        </text>
+
+        <!-- IT Infra → Model Loader (useful: hosts Lambda) -->
+        <line
+          class="arr-g"
+          x1="1180"
+          y1="90"
+          x2="760"
+          y2="276"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="1010" y="170">useful: hosts Lambda</text>
+
+        <!-- Regulatory Bodies mandates audit logging -->
+        <line
+          class="arr-g"
+          x1="785"
+          y1="90"
+          x2="185"
+          y2="518"
+          marker-end="url(#mg)"
+        />
+        <text class="lbl-arr-g" x="380" y="338">
+          useful: mandates audit (Art.12)
+        </text>
+
+        <!-- Fraudulent Users → Inference API (harmful: adversarial) -->
+        <line
+          class="arr-r"
+          x1="340"
+          y1="90"
+          x2="317"
+          y2="396"
+          marker-end="url(#mr)"
+        />
+        <text class="lbl-arr-r" x="248" y="240">
+          harmful: adversarial inputs
+        </text>
+      </svg>
+    </div>
+
+    <!-- Problem summary below the diagram -->
+    <div class="problems">
+      <h2>Problem Summary by Type</h2>
+      <div class="prob-grid">
+        <div class="prob-col harmful">
+          <h3>Harmful functions (9)</h3>
+          <ul>
+            <li>
+              <span class="dot-r"></span>Fraudulent users — injects —
+              adversarial transactions
+            </li>
+            <li>
+              <span class="dot-r"></span>Inference API — blocks — legitimate
+              customers via false positive
+            </li>
+            <li>
+              <span class="dot-r"></span>Inference API — misleads — consumers
+              via fake confidence score
+            </li>
+            <li>
+              <span class="dot-r"></span>Inference API — crashes — SHAP
+              explainer via ABI mismatch
+            </li>
+            <li>
+              <span class="dot-r"></span>Model bundle — locks — runtime
+              portability via pickle
+            </li>
+            <li>
+              <span class="dot-r"></span>CI/CD pipeline — exposes — credentials
+              via static IAM keys
+            </li>
+            <li>
+              <span class="dot-r"></span>Audit logger — violates — Art. 12 via
+              incomplete record
+            </li>
+            <li>
+              <span class="dot-r"></span>Feature engineering — introduces —
+              train-serve skew via hardcoded constants
+            </li>
+            <li>
+              <span class="dot-r"></span>Decision threshold — misses — adaptive
+              fraud patterns via rigidity
+            </li>
+          </ul>
+        </div>
+
+        <div class="prob-col insuff">
+          <h3>Insufficient functions (13)</h3>
+          <ul>
+            <li>
+              <span class="dot-g"></span>HPO tuner — optimises — XGBoost params
+              (never executed)
+            </li>
+            <li>
+              <span class="dot-g"></span>Training pipeline — exports — ONNX
+              model (disconnected)
+            </li>
+            <li>
+              <span class="dot-g"></span>Feature engineering — transforms — raw
+              inputs (3 features only)
+            </li>
+            <li>
+              <span class="dot-g"></span>Schema validation — validates —
+              requests (no range checks)
+            </li>
+            <li>
+              <span class="dot-g"></span>SHAP background — enables — explainer
+              init (explainer disabled)
+            </li>
+            <li>
+              <span class="dot-g"></span>Audit logger — feeds — drift monitor
+              (V1–V28 absent)
+            </li>
+            <li>
+              <span class="dot-g"></span>Override queue — routes — analyst
+              context (no SHAP)
+            </li>
+            <li>
+              <span class="dot-g"></span>Drift monitor — publishes — PSI (4
+              features; concept drift blind)
+            </li>
+            <li>
+              <span class="dot-g"></span>Bias tester — evaluates — fairness (4
+              segments; no directional)
+            </li>
+            <li>
+              <span class="dot-g"></span>Load tester — measures — latency SLA
+              (disconnected from CD)
+            </li>
+            <li>
+              <span class="dot-g"></span>Drift monitor — triggers — retraining
+              (no multi-signal logic)
+            </li>
+            <li>
+              <span class="dot-g"></span>Bias tester — evidences — compliance
+              (coverage too narrow)
+            </li>
+            <li>
+              <span class="dot-g"></span>SHAP explainer — populates — audit log
+              SHAP values (OP=0)
+            </li>
+          </ul>
+        </div>
+
+        <div class="prob-col absent">
+          <h3>Absent components / functions (7)</h3>
+          <ul>
+            <li>
+              <span class="dot-gr"></span>Online feature store — velocity
+              features per card / merchant
+            </li>
+            <li>
+              <span class="dot-gr"></span>Retraining trigger — automated
+              multi-signal retraining
+            </li>
+            <li>
+              <span class="dot-gr"></span>Calibrated confidence — Platt/isotonic
+              uncertainty score
+            </li>
+            <li>
+              <span class="dot-gr"></span>Rule-based fallback — heuristic scorer
+              on model failure
+            </li>
+            <li>
+              <span class="dot-gr"></span>Canary deployer — weighted Lambda
+              alias rollout
+            </li>
+            <li>
+              <span class="dot-gr"></span>Inference API — high-value fraud
+              escalation (risk-tiering)
+            </li>
+            <li>
+              <span class="dot-gr"></span>CI/CD pipeline — shadow evaluation of
+              model versions
+            </li>
+          </ul>
+        </div>
+
+        <div class="prob-col contra">
+          <h3>Contradictions (7)</h3>
+          <ul>
+            <li>
+              <span class="dot-p"></span>C1: Inference API → Customers: approves
+              legitimate ↔ blocks via false positive
+            </li>
+            <li>
+              <span class="dot-p"></span>C2: Inference API → SHAP: calls
+              explainer ↔ crashes via ABI mismatch
+            </li>
+            <li>
+              <span class="dot-p"></span>C3: Audit Logger → Regulators:
+              evidences compliance ↔ incomplete record violates Art. 12
+            </li>
+            <li>
+              <span class="dot-p"></span>C4: Decision Threshold → Fraud: blocks
+              fraud ↔ rigid value misses adaptive patterns
+            </li>
+            <li>
+              <span class="dot-p"></span>C5: Model Bundle → Loader: provides
+              model ↔ pickle lock-in creates silent version skew
+            </li>
+            <li>
+              <span class="dot-p"></span>C6: CI/CD → IT Infra: deploys service ↔
+              static IAM keys expose credentials
+            </li>
+            <li>
+              <span class="dot-p"></span>C7: Bias Tester → Regulators: gates
+              biased models ↔ 4 segments miss directional bias
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
