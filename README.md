@@ -536,3 +536,73 @@ fraud-detection-opti/
 ---
 
 _Dataset citation: Dal Pozzolo, Andrea et al. — Calibrating Probability with Undersampling for Unbalanced Classification. IEEE CIDM 2015. Worldline + ULB Machine Learning Group._
+
+
+
+# Attribution License 1.0
+
+Copyright (c) 2026 Salvatore Nasisi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the **"Software"**), to use, study, copy, modify, merge, publish, distribute, and sublicense the Software, subject to the following conditions:
+
+---
+
+## 1. Attribution Required
+
+All copies or substantial portions of the Software, including modified or derivative works, must retain:
+
+- the original copyright notice,
+- this license text,
+- and clear attribution to the original author: **Salvo**.
+
+---
+
+## 2. No False Authorship Claims
+
+You may not claim that the original Software was created entirely by you.
+
+Modified versions must clearly indicate that changes were made and must not misrepresent the origin of the original work.
+
+---
+
+## 3. Redistribution Conditions
+
+Any public redistribution of the Software, whether modified or unmodified, must include visible acknowledgment of the original author in:
+
+- source code,
+- documentation,
+- or repository metadata.
+
+### Example acknowledgment
+
+> "Based on original work by Salvo."
+
+---
+
+## 4. Personal and Private Use
+
+Private, personal, or internal use without redistribution does not require public attribution.
+
+---
+
+## 5. Commercial Use
+
+Commercial use is permitted provided attribution requirements are preserved and authorship is not misrepresented.
+
+---
+
+## 6. Warranty Disclaimer
+
+THE SOFTWARE IS PROVIDED **"AS IS"**, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+## 7. Termination
+
+Any violation of this license automatically terminates the rights granted under it.
+
+---
+
+By using, copying, modifying, or distributing this Software, you agree to the terms of this license.
