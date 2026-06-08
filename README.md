@@ -553,7 +553,7 @@ All copies or substantial portions of the Software, including modified or deriva
 
 - the original copyright notice,
 - this license text,
-- and clear attribution to the original author: **Salvo**.
+- and clear attribution to the original author: **Salvatore Nasisi**.
 
 ---
 
@@ -575,7 +575,7 @@ Any public redistribution of the Software, whether modified or unmodified, must 
 
 ### Example acknowledgment
 
-> "Based on original work by Salvo."
+> "Based on original work by Salvatore Nasisi."
 
 ---
 
